@@ -1,12 +1,28 @@
 #include "cpu_opcode.h"
 
-static opcode_entry_t *find_entry(uint8_t opcode);
+#include <assert.h>
+
+/* Defines */
+
+/* Typedefs */
+
+/* Constants */
+
+/* Private variables */
+
+/* Private function declarations */
+
+static opcode_handler_t find_handler(const opcode_entry_t opcode_entries[], int entries_count, uint8_t opcode);
+
+/* Inlined private function definitions */
+
+/* Public function definitions */
 
 void opcode_init(const opcode_entry_t opcode_entries[], int entries_count, opcode_handler_t opcode_handlers[], int handlers_count)
 {
     for (int opcode = 0; opcode < handlers_count; opcode++)
     {
-        opcode_handler_t *handler = find_handler(opcode_entries, entries_count, (uint8_t)opcode);
+        opcode_handler_t handler = find_handler(opcode_entries, entries_count, (uint8_t)opcode);
         if (handler)
         {
             opcode_handlers[opcode] = handler;
@@ -24,7 +40,9 @@ int opcode_UNHANDLED(cpu_t *p_cpu)
     return 0;
 }
 
-static opcode_handler_t *find_handler(const opcode_entry_t opcode_entries[], int entries_count, uint8_t opcode)
+/* Private function definitions */
+
+static opcode_handler_t find_handler(const opcode_entry_t opcode_entries[], int entries_count, uint8_t opcode)
 {
     for (int entry = 0; entry < entries_count; entry++)
     {
