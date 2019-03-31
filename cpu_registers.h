@@ -298,4 +298,4 @@ static inline uint8_t get_mnemonic(cpu_t *p_cpu, mnemonic_t m)
     }
 }
 
-#endif /*CPU_BASE_H_*/
+#endif /*CPU_REGISTERS_H_*/

@@ -21,9 +21,9 @@
 
 int cpu_run(cpu_t *p_cpu)
 {
-	int cycles =
+	int cycles = opcode8_handler(p_cpu);
 
-		if (p_cpu->ei_counter)
+	if (p_cpu->ei_counter)
 	{
 		p_cpu->ei_counter -= 1;
 		if (!p_cpu->ei_counter)

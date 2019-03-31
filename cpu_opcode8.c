@@ -2,6 +2,7 @@
 
 #include "cpu_opcode16.h"
 #include "cpu_opcode.h"
+#include "cpu_alu.h"
 #include "cpu_registers.h"
 
 /* Defines */
@@ -268,7 +269,7 @@ static int opcode8_LD_A_R(cpu_t *p_cpu)
 	uint8_t r = (*(p_cpu->pc) >> 4) & 0x03;
 	uint16_t rv = get_reg2(p_cpu, r);
 
-	set_msb(p_cpu->reg_AF, *(p_cpu->mem + rv));
+	set_msb(&(p_cpu->reg_AF), *(p_cpu->mem + rv));
 
 	p_cpu->pc += 1;
 	return 8;
@@ -385,7 +386,7 @@ static int opcode8_RLCA(cpu_t *p_cpu)
 	uint8_t flag_c = (reg_a >> 7) & 0x01;
 	reg_a = (reg_a << 1) | flag_c;
 
-	set_msb(p_cpu->reg_AF, reg_a);
+	set_msb(&(p_cpu->reg_AF), reg_a);
 
 	set_flag_Z(p_cpu, reg_a == 0);
 	set_flag_N(p_cpu, 0);
@@ -402,7 +403,7 @@ static int opcode8_RRCA(cpu_t *p_cpu)
 	uint8_t flag_c = reg_a & 0x01;
 	reg_a = (reg_a >> 1) | (flag_c << 7);
 
-	set_msb(p_cpu->reg_AF, reg_a);
+	set_msb(&(p_cpu->reg_AF), reg_a);
 
 	set_flag_Z(p_cpu, reg_a == 0);
 	set_flag_N(p_cpu, 0);
@@ -419,7 +420,7 @@ static int opcode8_RLA(cpu_t *p_cpu)
 	uint8_t flag_c = (reg_a >> 7) & 0x01;
 	reg_a = (reg_a << 1) | get_flag_C(p_cpu);
 
-	set_msb(p_cpu->reg_AF, reg_a);
+	set_msb(&(p_cpu->reg_AF), reg_a);
 
 	set_flag_Z(p_cpu, reg_a == 0);
 	set_flag_N(p_cpu, 0);
@@ -436,7 +437,7 @@ static int opcode8_RRA(cpu_t *p_cpu)
 	uint8_t flag_c = reg_a & 0x01;
 	reg_a = (reg_a >> 1) | (get_flag_C(p_cpu) << 7);
 
-	set_msb(p_cpu->reg_AF, reg_a);
+	set_msb(&(p_cpu->reg_AF), reg_a);
 
 	set_flag_Z(p_cpu, reg_a == 0);
 	set_flag_N(p_cpu, 0);
@@ -485,7 +486,7 @@ static int opcode8_LDI_HL_A(cpu_t *p_cpu)
 
 static int opcode8_LDI_A_HL(cpu_t *p_cpu)
 {
-	set_msb(&p_cpu->reg_AF, *(p_cpu->mem + p_cpu->reg_HL));
+	set_msb(&(p_cpu->reg_AF), *(p_cpu->mem + p_cpu->reg_HL));
 	p_cpu->reg_HL += 1;
 
 	p_cpu->pc += 1;
@@ -503,7 +504,7 @@ static int opcode8_LDD_HL_A(cpu_t *p_cpu)
 
 static int opcode8_LDD_A_HL(cpu_t *p_cpu)
 {
-	set_msb(&p_cpu->reg_AF, *(p_cpu->mem + p_cpu->reg_HL));
+	set_msb(&(p_cpu->reg_AF), *(p_cpu->mem + p_cpu->reg_HL));
 	p_cpu->reg_HL -= 1;
 
 	p_cpu->pc += 1;
@@ -557,7 +558,7 @@ static int opcode8_DAA(cpu_t *p_cpu)
 static int opcode8_CPL(cpu_t *p_cpu)
 {
 	uint8_t reg_a = ~get_msb(p_cpu->reg_AF);
-	set_msb(&p_cpu->reg_AF, reg_a);
+	set_msb(&(p_cpu->reg_AF), reg_a);
 
 	set_flag_N(p_cpu, 1);
 	set_flag_H(p_cpu, 1);
@@ -877,11 +878,8 @@ static int opcode8_CP_A_N(cpu_t *p_cpu)
 static int opcode8_POP_R(cpu_t *p_cpu)
 {
 	uint8_t r = ((*p_cpu->pc) >> 4) & 0x03;
-	uint16_t value = stack_pop(p_cpu);
-	value <<= 8;
-	value |= stack_pop(p_cpu);
 
-	set_reg1(p_cpu, r, value);
+	set_reg1(p_cpu, r, pop_u16(p_cpu));
 
 	p_cpu->pc += 1;
 	return 12;

@@ -2,6 +2,7 @@
 #define CPU_BASE_H_
 
 #include <stdint.h>
+#include <stdlib.h>
 
 /* Typedefs */
 
