@@ -199,7 +199,10 @@ int opcode8_handler(cpu_t *p_cpu)
 	// Check whether opcode16 module was initialized.
 	assert(opcode8_handlers[0] != NULL);
 
-	return opcode8_handlers[*(p_cpu->pc)](p_cpu);
+	uint8_t opcode;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &opcode);
+
+	return opcode8_handlers[opcode](p_cpu);
 }
 
 /* Private function definitions */
@@ -213,12 +216,10 @@ static int opcode8_NOP(cpu_t *p_cpu)
 
 static int opcode8_LD_N_SP(cpu_t *p_cpu)
 {
-	uint16_t n = *(p_cpu->pc + 2);
-	n <<= 8;
-	n |= *(p_cpu->pc + 1);
+	uint16_t n;
+	(void)mmu_read_u16(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
-	*(p_cpu->mem + n) = (uint16_t)(p_cpu->sp - p_cpu->mem);
-	*(p_cpu->mem + n + 1) = (uint16_t)(p_cpu->sp - p_cpu->mem) >> 8;
+	(void)mmu_write_u16(p_cpu->p_mmu, n, p_cpu->sp);
 
 	p_cpu->pc += 3;
 	return 20;
@@ -226,10 +227,13 @@ static int opcode8_LD_N_SP(cpu_t *p_cpu)
 
 static int opcode8_LD_R_N(cpu_t *p_cpu)
 {
-	uint8_t r = (*(p_cpu->pc) >> 4) & 0x03;
-	uint16_t n = *(p_cpu->pc + 2);
-	n <<= 8;
-	n |= *(p_cpu->pc + 1);
+	uint8_t r;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &r);
+	r >>= 4;
+	r &= 0x03;
+
+	uint8_t n;
+	(void)mmu_read_u16(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
 	set_reg2(p_cpu, r, n);
 
@@ -239,7 +243,11 @@ static int opcode8_LD_R_N(cpu_t *p_cpu)
 
 static int opcode8_ADD_HL_R(cpu_t *p_cpu)
 {
-	uint8_t r = (*(p_cpu->pc) >> 4) & 0x03;
+	uint8_t r;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &r);
+	r >>= 4;
+	r &= 0x03;
+
 	uint16_t rv = get_reg2(p_cpu, r);
 	uint32_t sum = p_cpu->reg_HL + rv;
 
@@ -255,10 +263,14 @@ static int opcode8_ADD_HL_R(cpu_t *p_cpu)
 
 static int opcode8_LD_R_A(cpu_t *p_cpu)
 {
-	uint8_t r = (*(p_cpu->pc) >> 4) & 0x03;
+	uint8_t r;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &r);
+	r >>= 4;
+	r &= 0x03;
+
 	uint16_t rv = get_reg2(p_cpu, r);
 
-	*(p_cpu->mem + rv) = get_msb(p_cpu->reg_AF);
+	(void)mmu_write_u8(p_cpu->p_mmu, rv, get_msb(p_cpu->reg_AF));
 
 	p_cpu->pc += 1;
 	return 8;
@@ -266,10 +278,17 @@ static int opcode8_LD_R_A(cpu_t *p_cpu)
 
 static int opcode8_LD_A_R(cpu_t *p_cpu)
 {
-	uint8_t r = (*(p_cpu->pc) >> 4) & 0x03;
+	uint8_t r;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &r);
+	r >>= 4;
+	r &= 0x03;
+
 	uint16_t rv = get_reg2(p_cpu, r);
 
-	set_msb(&(p_cpu->reg_AF), *(p_cpu->mem + rv));
+	uint8_t a;
+	(void)mmu_read_u8(p_cpu->p_mmu, rv, a);
+
+	set_msb(&(p_cpu->reg_AF), a);
 
 	p_cpu->pc += 1;
 	return 8;
@@ -277,7 +296,10 @@ static int opcode8_LD_A_R(cpu_t *p_cpu)
 
 static int opcode8_INC_R(cpu_t *p_cpu)
 {
-	uint8_t r = (*(p_cpu->pc) >> 4) & 0x03;
+	uint8_t r;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &r);
+	r >>= 4;
+	r &= 0x03;
 
 	set_reg2(p_cpu, r, get_reg2(p_cpu, r) + 1);
 
@@ -287,7 +309,10 @@ static int opcode8_INC_R(cpu_t *p_cpu)
 
 static int opcode8_DEC_R(cpu_t *p_cpu)
 {
-	uint8_t r = (*(p_cpu->pc) >> 4) & 0x03;
+	uint8_t r;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &r);
+	r >>= 4;
+	r &= 0x03;
 
 	set_reg2(p_cpu, r, get_reg2(p_cpu, r) - 1);
 
@@ -297,7 +322,11 @@ static int opcode8_DEC_R(cpu_t *p_cpu)
 
 static int opcode8_INC_D(cpu_t *p_cpu)
 {
-	uint8_t d = (*(p_cpu->pc) >> 3) & 0x07;
+	uint8_t d;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &d);
+	d >>= 3;
+	d &= 0x07;
+
 	uint16_t dv = get_reg3(p_cpu, d);
 
 	set_flag_H(p_cpu, (((dv & 0x0F) + 1) & 0x10) >> 4);
@@ -314,14 +343,17 @@ static int opcode8_INC_D(cpu_t *p_cpu)
 
 static int opcode8_INC_HL(cpu_t *p_cpu)
 {
-	uint8_t *p_value = p_cpu->mem + p_cpu->reg_HL;
+	uint8_t value;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
-	set_flag_H(p_cpu, ((*p_value & 0x0F) + 1) >> 4);
+	set_flag_H(p_cpu, ((value & 0x0F) + 1) >> 4);
 
-	*p_value += 1;
+	value += 1;
 
-	set_flag_Z(p_cpu, 0 == *p_value);
+	set_flag_Z(p_cpu, 0 == value);
 	set_flag_N(p_cpu, 1);
+
+	(void)mmu_write_u8(p_cpu->p_mmu, p_cpu->reg_HL, value);
 
 	p_cpu->pc += 1;
 	return 12;
@@ -329,7 +361,11 @@ static int opcode8_INC_HL(cpu_t *p_cpu)
 
 static int opcode8_DEC_D(cpu_t *p_cpu)
 {
-	uint8_t d = (*(p_cpu->pc) >> 3) & 0x07;
+	uint8_t d;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &d);
+	d >>= 3;
+	d &= 0x07;
+
 	uint16_t dv = get_reg3(p_cpu, d);
 
 	set_flag_H(p_cpu, 0 == dv);
@@ -347,14 +383,17 @@ static int opcode8_DEC_D(cpu_t *p_cpu)
 
 static int opcode8_DEC_HL(cpu_t *p_cpu)
 {
-	uint8_t *p_value = p_cpu->mem + p_cpu->reg_HL;
+	uint8_t value;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
-	set_flag_H(p_cpu, 0 == *p_value);
+	set_flag_H(p_cpu, 0 == value);
 
-	*p_value -= 1;
+	value -= 1;
 
-	set_flag_Z(p_cpu, 0 == *p_value);
+	set_flag_Z(p_cpu, 0 == value);
 	set_flag_N(p_cpu, 1);
+
+	(void)mmu_write_u8(p_cpu->p_mmu, p_cpu->reg_HL, value);
 
 	p_cpu->pc += 1;
 	return 12;
@@ -362,9 +401,15 @@ static int opcode8_DEC_HL(cpu_t *p_cpu)
 
 static int opcode8_LD_D_N(cpu_t *p_cpu)
 {
-	uint8_t d = (*(p_cpu->pc) >> 3) & 0x07;
+	uint8_t d;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &d);
+	d >>= 3;
+	d &= 0x07;
 
-	set_reg3(p_cpu, d, *(p_cpu->pc + 1));
+	uint8_t n;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &n);
+
+	set_reg3(p_cpu, d, n);
 
 	p_cpu->pc += 2;
 	return 8;
@@ -372,9 +417,10 @@ static int opcode8_LD_D_N(cpu_t *p_cpu)
 
 static int opcode8_LD_HL_N(cpu_t *p_cpu)
 {
-	uint8_t *p_value = p_cpu->mem + p_cpu->reg_HL;
+	uint8_t n;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
-	*p_value = *(p_cpu->pc + 1);
+	(void)mmu_write_u8(p_cpu->p_mmu, p_cpu->reg_HL, n);
 
 	p_cpu->pc += 2;
 	return 12;
@@ -458,18 +504,27 @@ static int opcode8_STOP(cpu_t *p_cpu)
 //Add n to current address and jump to it.
 static int opcode8_JR_N(cpu_t *p_cpu)
 {
-	p_cpu->pc += *(p_cpu->pc + 1);
+	uint8_t n;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &n);
+
+	p_cpu->pc += n;
 	return 8;
 }
 
 //If following condition is true then add n to current address and jump to it.
 static int opcode8_JR_F_N(cpu_t *p_cpu)
 {
-	uint8_t m = (*p_cpu->pc >> 3) & 0x03;
+	uint8_t m;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &m);
+	m >>= 3;
+	m &= 0x03;
+
+	uint8_t n;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
 	if (get_mnemonic(p_cpu, m))
 	{
-		p_cpu->pc += *(p_cpu->pc + 1);
+		p_cpu->pc += n;
 	}
 
 	return 8;
@@ -477,7 +532,7 @@ static int opcode8_JR_F_N(cpu_t *p_cpu)
 
 static int opcode8_LDI_HL_A(cpu_t *p_cpu)
 {
-	*(p_cpu->mem + p_cpu->reg_HL) = get_msb(p_cpu->reg_AF);
+	(void)mmu_write_u8(p_cpu->p_mmu, p_cpu->reg_HL, get_msb(p_cpu->reg_AF));
 	p_cpu->reg_HL += 1;
 
 	p_cpu->pc += 1;
@@ -486,7 +541,10 @@ static int opcode8_LDI_HL_A(cpu_t *p_cpu)
 
 static int opcode8_LDI_A_HL(cpu_t *p_cpu)
 {
-	set_msb(&(p_cpu->reg_AF), *(p_cpu->mem + p_cpu->reg_HL));
+	uint8_t a;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &a);
+
+	set_msb(&(p_cpu->reg_AF), a);
 	p_cpu->reg_HL += 1;
 
 	p_cpu->pc += 1;
@@ -495,7 +553,7 @@ static int opcode8_LDI_A_HL(cpu_t *p_cpu)
 
 static int opcode8_LDD_HL_A(cpu_t *p_cpu)
 {
-	*(p_cpu->mem + p_cpu->reg_HL) = get_msb(p_cpu->reg_AF);
+	(void)mmu_write_u8(p_cpu->p_mmu, p_cpu->reg_HL, get_msb(p_cpu->reg_AF));
 	p_cpu->reg_HL -= 1;
 
 	p_cpu->pc += 1;
@@ -504,7 +562,10 @@ static int opcode8_LDD_HL_A(cpu_t *p_cpu)
 
 static int opcode8_LDD_A_HL(cpu_t *p_cpu)
 {
-	set_msb(&(p_cpu->reg_AF), *(p_cpu->mem + p_cpu->reg_HL));
+	uint8_t a;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &a);
+
+	set_msb(&(p_cpu->reg_AF), a);
 	p_cpu->reg_HL -= 1;
 
 	p_cpu->pc += 1;
@@ -587,8 +648,11 @@ static int opcode8_CCF(cpu_t *p_cpu)
 
 static int opcode8_LD_D_D(cpu_t *p_cpu)
 {
-	uint8_t d0 = (*(p_cpu->pc) >> 3) & 0x07;
-	uint8_t d1 = (*(p_cpu->pc) >> 0) & 0x07;
+	uint8_t opcode;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &opcode);
+
+	uint8_t d0 = (opcode >> 3) & 0x07;
+	uint8_t d1 = (opcode >> 0) & 0x07;
 
 	set_reg3(p_cpu, d0, get_reg3(p_cpu, d1));
 
@@ -598,11 +662,15 @@ static int opcode8_LD_D_D(cpu_t *p_cpu)
 
 static int opcode8_LD_D_HL(cpu_t *p_cpu)
 {
-	uint8_t d = (*(p_cpu->pc) >> 3) & 0x07;
+	uint8_t d;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &d);
+	d >>= 3;
+	d &= 0x07;
 
-	uint8_t *p_value = p_cpu->mem + p_cpu->reg_HL;
+	uint8_t value;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
-	set_reg3(p_cpu, d, *p_value);
+	set_reg3(p_cpu, d, value);
 
 	p_cpu->pc += 1;
 	return 8;
@@ -610,11 +678,11 @@ static int opcode8_LD_D_HL(cpu_t *p_cpu)
 
 static int opcode8_LD_HL_D(cpu_t *p_cpu)
 {
-	uint8_t d = *(p_cpu->pc) & 0x07;
+	uint8_t d;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &d);
+	d &= 0x07;
 
-	uint8_t *p_value = p_cpu->mem + p_cpu->reg_HL;
-
-	*p_value = get_reg3(p_cpu, d);
+	(void)mmu_write_u8(p_cpu->p_mmu, p_cpu->reg_HL, get_reg3(p_cpu, d));
 
 	p_cpu->pc += 1;
 	return 8;
@@ -629,7 +697,10 @@ static int opcode8_HALT(cpu_t *p_cpu)
 
 static int opcode8_ADD_A_D(cpu_t *p_cpu)
 {
-	uint8_t d = (*(p_cpu->pc) >> 0) & 0x07;
+	uint8_t d;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &d);
+	d &= 0x07;
+
 	uint8_t dv = get_reg3(p_cpu, d);
 
 	alu_ADD(p_cpu, dv);
@@ -640,7 +711,10 @@ static int opcode8_ADD_A_D(cpu_t *p_cpu)
 
 static int opcode8_ADC_A_D(cpu_t *p_cpu)
 {
-	uint8_t d = (*(p_cpu->pc) >> 0) & 0x07;
+	uint8_t d;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &d);
+	d &= 0x07;
+
 	uint8_t dv = get_reg3(p_cpu, d);
 
 	alu_ADC(p_cpu, dv);
@@ -651,7 +725,10 @@ static int opcode8_ADC_A_D(cpu_t *p_cpu)
 
 static int opcode8_SUB_A_D(cpu_t *p_cpu)
 {
-	uint8_t d = (*(p_cpu->pc) >> 0) & 0x07;
+	uint8_t d;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &d);
+	d &= 0x07;
+
 	uint8_t dv = get_reg3(p_cpu, d);
 
 	alu_SUB(p_cpu, dv);
@@ -662,7 +739,10 @@ static int opcode8_SUB_A_D(cpu_t *p_cpu)
 
 static int opcode8_SBC_A_D(cpu_t *p_cpu)
 {
-	uint8_t d = (*(p_cpu->pc) >> 0) & 0x07;
+	uint8_t d;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &d);
+	d &= 0x07;
+
 	uint8_t dv = get_reg3(p_cpu, d);
 
 	alu_SBC(p_cpu, dv);
@@ -673,7 +753,10 @@ static int opcode8_SBC_A_D(cpu_t *p_cpu)
 
 static int opcode8_AND_A_D(cpu_t *p_cpu)
 {
-	uint8_t d = (*(p_cpu->pc) >> 0) & 0x07;
+	uint8_t d;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &d);
+	d &= 0x07;
+
 	uint8_t dv = get_reg3(p_cpu, d);
 
 	alu_AND(p_cpu, dv);
@@ -684,7 +767,10 @@ static int opcode8_AND_A_D(cpu_t *p_cpu)
 
 static int opcode8_XOR_A_D(cpu_t *p_cpu)
 {
-	uint8_t d = (*(p_cpu->pc) >> 0) & 0x07;
+	uint8_t d;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &d);
+	d &= 0x07;
+
 	uint8_t dv = get_reg3(p_cpu, d);
 
 	alu_XOR(p_cpu, dv);
@@ -695,7 +781,10 @@ static int opcode8_XOR_A_D(cpu_t *p_cpu)
 
 static int opcode8_OR_A_D(cpu_t *p_cpu)
 {
-	uint8_t d = (*(p_cpu->pc) >> 0) & 0x07;
+	uint8_t d;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &d);
+	d &= 0x07;
+
 	uint8_t dv = get_reg3(p_cpu, d);
 
 	alu_OR(p_cpu, dv);
@@ -706,7 +795,10 @@ static int opcode8_OR_A_D(cpu_t *p_cpu)
 
 static int opcode8_CP_A_D(cpu_t *p_cpu)
 {
-	uint8_t d = (*(p_cpu->pc) >> 0) & 0x07;
+	uint8_t d;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &d);
+	d &= 0x07;
+
 	uint8_t dv = get_reg3(p_cpu, d);
 
 	alu_CP(p_cpu, dv);
@@ -717,9 +809,10 @@ static int opcode8_CP_A_D(cpu_t *p_cpu)
 
 static int opcode8_ADD_A_HL(cpu_t *p_cpu)
 {
-	uint8_t *p_value = p_cpu->mem + p_cpu->reg_HL;
+	uint8_t value;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
-	alu_ADD(p_cpu, *p_value);
+	alu_ADD(p_cpu, value);
 
 	p_cpu->pc += 1;
 	return 8;
@@ -727,9 +820,10 @@ static int opcode8_ADD_A_HL(cpu_t *p_cpu)
 
 static int opcode8_ADC_A_HL(cpu_t *p_cpu)
 {
-	uint8_t *p_value = p_cpu->mem + p_cpu->reg_HL;
+	uint8_t value;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
-	alu_ADC(p_cpu, *p_value);
+	alu_ADC(p_cpu, value);
 
 	p_cpu->pc += 1;
 	return 8;
@@ -737,9 +831,10 @@ static int opcode8_ADC_A_HL(cpu_t *p_cpu)
 
 static int opcode8_SUB_A_HL(cpu_t *p_cpu)
 {
-	uint8_t *p_value = p_cpu->mem + p_cpu->reg_HL;
+	uint8_t value;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
-	alu_SUB(p_cpu, *p_value);
+	alu_SUB(p_cpu, value);
 
 	p_cpu->pc += 1;
 	return 8;
@@ -747,9 +842,10 @@ static int opcode8_SUB_A_HL(cpu_t *p_cpu)
 
 static int opcode8_SBC_A_HL(cpu_t *p_cpu)
 {
-	uint8_t *p_value = p_cpu->mem + p_cpu->reg_HL;
+	uint8_t value;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
-	alu_SBC(p_cpu, *p_value);
+	alu_SBC(p_cpu, value);
 
 	p_cpu->pc += 1;
 	return 8;
@@ -757,9 +853,10 @@ static int opcode8_SBC_A_HL(cpu_t *p_cpu)
 
 static int opcode8_AND_A_HL(cpu_t *p_cpu)
 {
-	uint8_t *p_value = p_cpu->mem + p_cpu->reg_HL;
+	uint8_t value;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
-	alu_AND(p_cpu, *p_value);
+	alu_AND(p_cpu, value);
 
 	p_cpu->pc += 1;
 	return 8;
@@ -767,9 +864,10 @@ static int opcode8_AND_A_HL(cpu_t *p_cpu)
 
 static int opcode8_XOR_A_HL(cpu_t *p_cpu)
 {
-	uint8_t *p_value = p_cpu->mem + p_cpu->reg_HL;
+	uint8_t value;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
-	alu_XOR(p_cpu, *p_value);
+	alu_XOR(p_cpu, value);
 
 	p_cpu->pc += 1;
 	return 8;
@@ -777,9 +875,10 @@ static int opcode8_XOR_A_HL(cpu_t *p_cpu)
 
 static int opcode8_OR_A_HL(cpu_t *p_cpu)
 {
-	uint8_t *p_value = p_cpu->mem + p_cpu->reg_HL;
+	uint8_t value;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
-	alu_OR(p_cpu, *p_value);
+	alu_OR(p_cpu, value);
 
 	p_cpu->pc += 1;
 	return 8;
@@ -787,9 +886,10 @@ static int opcode8_OR_A_HL(cpu_t *p_cpu)
 
 static int opcode8_CP_A_HL(cpu_t *p_cpu)
 {
-	uint8_t *p_value = p_cpu->mem + p_cpu->reg_HL;
+	uint8_t value;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
-	alu_CP(p_cpu, *p_value);
+	alu_CP(p_cpu, value);
 
 	p_cpu->pc += 1;
 	return 8;
@@ -797,7 +897,8 @@ static int opcode8_CP_A_HL(cpu_t *p_cpu)
 
 static int opcode8_ADD_A_N(cpu_t *p_cpu)
 {
-	uint8_t n = *(p_cpu->pc + 1);
+	uint8_t n;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
 	alu_ADD(p_cpu, n);
 
@@ -807,7 +908,8 @@ static int opcode8_ADD_A_N(cpu_t *p_cpu)
 
 static int opcode8_ADC_A_N(cpu_t *p_cpu)
 {
-	uint8_t n = *(p_cpu->pc + 1);
+	uint8_t n;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
 	alu_ADC(p_cpu, n);
 
@@ -817,7 +919,8 @@ static int opcode8_ADC_A_N(cpu_t *p_cpu)
 
 static int opcode8_SUB_A_N(cpu_t *p_cpu)
 {
-	uint8_t n = *(p_cpu->pc + 1);
+	uint8_t n;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
 	alu_SUB(p_cpu, n);
 
@@ -827,7 +930,8 @@ static int opcode8_SUB_A_N(cpu_t *p_cpu)
 
 static int opcode8_SBC_A_N(cpu_t *p_cpu)
 {
-	uint8_t n = *(p_cpu->pc + 1);
+	uint8_t n;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
 	alu_SBC(p_cpu, n);
 
@@ -837,7 +941,8 @@ static int opcode8_SBC_A_N(cpu_t *p_cpu)
 
 static int opcode8_AND_A_N(cpu_t *p_cpu)
 {
-	uint8_t n = *(p_cpu->pc + 1);
+	uint8_t n;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
 	alu_AND(p_cpu, n);
 
@@ -847,7 +952,8 @@ static int opcode8_AND_A_N(cpu_t *p_cpu)
 
 static int opcode8_XOR_A_N(cpu_t *p_cpu)
 {
-	uint8_t n = *(p_cpu->pc + 1);
+	uint8_t n;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
 	alu_XOR(p_cpu, n);
 
@@ -857,7 +963,8 @@ static int opcode8_XOR_A_N(cpu_t *p_cpu)
 
 static int opcode8_OR_A_N(cpu_t *p_cpu)
 {
-	uint8_t n = *(p_cpu->pc + 1);
+	uint8_t n;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
 	alu_OR(p_cpu, n);
 
@@ -867,7 +974,8 @@ static int opcode8_OR_A_N(cpu_t *p_cpu)
 
 static int opcode8_CP_A_N(cpu_t *p_cpu)
 {
-	uint8_t n = *(p_cpu->pc + 1);
+	uint8_t n;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
 	alu_CP(p_cpu, n);
 
@@ -877,7 +985,10 @@ static int opcode8_CP_A_N(cpu_t *p_cpu)
 
 static int opcode8_POP_R(cpu_t *p_cpu)
 {
-	uint8_t r = ((*p_cpu->pc) >> 4) & 0x03;
+	uint8_t r;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &r);
+	r >>= 4;
+	r &= 0x03;
 
 	set_reg1(p_cpu, r, pop_u16(p_cpu));
 
@@ -887,7 +998,10 @@ static int opcode8_POP_R(cpu_t *p_cpu)
 
 static int opcode8_PUSH_R(cpu_t *p_cpu)
 {
-	uint8_t r = ((*p_cpu->pc) >> 4) & 0x03;
+	uint8_t r;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &r);
+	r >>= 4;
+	r &= 0x03;
 
 	push_u16(p_cpu, get_reg1(p_cpu, r));
 
@@ -899,11 +1013,13 @@ static int opcode8_PUSH_R(cpu_t *p_cpu)
 //Jump to address $0000 + n.
 static int opcode8_RST_N(cpu_t *p_cpu)
 {
-	uint16_t addr = (*p_cpu->pc) & 0x38;
+	uint8_t n;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &n);
+	n &= 0x38;
 
 	push_pc(p_cpu);
 
-	jump(p_cpu, addr);
+	jump(p_cpu, n);
 	return 32;
 }
 
@@ -916,13 +1032,16 @@ static int opcode8_RET(cpu_t *p_cpu)
 static int opcode8_RET_I(cpu_t *p_cpu)
 {
 	pop_pc(p_cpu);
-	p_cpu->irq_mask = 0xFF;
+	p_cpu->irq_master_enable = 1;
 	return 8;
 }
 
 static int opcode8_RET_F(cpu_t *p_cpu)
 {
-	uint8_t m = (*p_cpu->pc >> 3) & 0x03;
+	uint8_t m;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &m);
+	m >>= 3;
+	m &= 0x03;
 
 	if (get_mnemonic(p_cpu, m))
 	{
@@ -935,25 +1054,26 @@ static int opcode8_RET_F(cpu_t *p_cpu)
 
 static int opcode8_JP_N(cpu_t *p_cpu)
 {
-	uint16_t addr = *(p_cpu->pc + 2);
-	addr <<= 8;
-	addr |= *(p_cpu->pc + 1);
+	uint16_t n;
+	(void)mmu_read_u16(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
-	jump(p_cpu, addr);
+	jump(p_cpu, n);
 	return 12;
 }
 
 static int opcode8_JP_F_N(cpu_t *p_cpu)
 {
-	uint8_t m = (*p_cpu->pc >> 3) & 0x03;
+	uint8_t m;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &m);
+	m >>= 3;
+	m &= 0x03;
 
-	uint16_t addr = *(p_cpu->pc + 2);
-	addr <<= 8;
-	addr |= *(p_cpu->pc + 1);
+	uint16_t n;
+	(void)mmu_read_u16(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
 	if (get_mnemonic(p_cpu, m))
 	{
-		jump(p_cpu, addr);
+		jump(p_cpu, n);
 	}
 	else
 	{
@@ -965,24 +1085,25 @@ static int opcode8_JP_F_N(cpu_t *p_cpu)
 
 static int opcode8_CALL_N(cpu_t *p_cpu)
 {
-	uint16_t addr = *(p_cpu->pc + 2);
-	addr <<= 8;
-	addr |= *(p_cpu->pc + 1);
+	uint16_t n;
+	(void)mmu_read_u16(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
 	p_cpu->pc += 3;
 	push_pc(p_cpu);
 
-	jump(p_cpu, addr);
+	jump(p_cpu, n);
 	return 12;
 }
 
 static int opcode8_CALL_F_N(cpu_t *p_cpu)
 {
-	uint8_t m = (*p_cpu->pc >> 3) & 0x03;
+	uint8_t m;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &m);
+	m >>= 3;
+	m &= 0x03;
 
-	uint16_t addr = *(p_cpu->pc + 2);
-	addr <<= 8;
-	addr |= *(p_cpu->pc + 1);
+	uint16_t n;
+	(void)mmu_read_u16(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
 	p_cpu->pc += 3;
 
@@ -990,7 +1111,7 @@ static int opcode8_CALL_F_N(cpu_t *p_cpu)
 	{
 		push_pc(p_cpu);
 
-		jump(p_cpu, addr);
+		jump(p_cpu, n);
 	}
 
 	return 12;
@@ -998,17 +1119,17 @@ static int opcode8_CALL_F_N(cpu_t *p_cpu)
 
 static int opcode8_ADD_SP_N(cpu_t *p_cpu)
 {
-	uint8_t n = *(p_cpu->pc + 1);
+	uint8_t n;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
-	uint16_t reg_sp = p_cpu->sp - p_cpu->mem;
-	uint32_t result = reg_sp + n;
+	uint32_t result = p_cpu->sp + n;
 
 	set_flag_N(p_cpu, 0);
 	set_flag_Z(p_cpu, 0);
-	set_flag_H(p_cpu, ((reg_sp & 0x0FFF) + n) >> 12);
+	set_flag_H(p_cpu, ((p_cpu->sp & 0x0FFF) + n) >> 12);
 	set_flag_C(p_cpu, result >> 16);
 
-	p_cpu->sp = p_cpu->mem + (result & 0xFFFF);
+	p_cpu->sp = result;
 
 	p_cpu->pc += 2;
 	return 16;
@@ -1016,14 +1137,14 @@ static int opcode8_ADD_SP_N(cpu_t *p_cpu)
 
 static int opcode8_LD_HL_SP_N(cpu_t *p_cpu)
 {
-	uint8_t n = *(p_cpu->pc + 1);
+	uint8_t n;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
-	uint16_t reg_sp = p_cpu->sp - p_cpu->mem;
-	uint32_t result = reg_sp + n;
+	uint32_t result = p_cpu->sp + n;
 
 	set_flag_N(p_cpu, 0);
 	set_flag_Z(p_cpu, 0);
-	set_flag_H(p_cpu, ((reg_sp & 0x0FFF) + n) >> 12);
+	set_flag_H(p_cpu, ((p_cpu->sp & 0x0FFF) + n) >> 12);
 	set_flag_C(p_cpu, result >> 16);
 
 	p_cpu->reg_HL = result;
@@ -1034,9 +1155,10 @@ static int opcode8_LD_HL_SP_N(cpu_t *p_cpu)
 
 static int opcode8_LD_FF00_N_A(cpu_t *p_cpu)
 {
-	uint8_t n = *(p_cpu->pc + 1);
+	uint8_t n;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
-	*(p_cpu->mem + 0xFF00 + n) = get_msb(p_cpu->reg_AF);
+	(void)mmu_write_u8(p_cpu->p_mmu, 0xFF00 + n, get_msb(p_cpu->reg_AF));
 
 	p_cpu->pc += 2;
 	return 12;
@@ -1044,9 +1166,13 @@ static int opcode8_LD_FF00_N_A(cpu_t *p_cpu)
 
 static int opcode8_LD_A_FF00_N(cpu_t *p_cpu)
 {
-	uint8_t n = *(p_cpu->pc + 1);
+	uint8_t n;
+	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
-	set_msb(&(p_cpu->reg_AF), *(p_cpu->mem + 0xFF00 + n));
+	uint8_t a;
+	(void)mmu_read_u8(p_cpu->p_mmu, 0xFF00 + n, &a);
+
+	set_msb(&(p_cpu->reg_AF), a);
 
 	p_cpu->pc += 2;
 	return 12;
@@ -1054,7 +1180,7 @@ static int opcode8_LD_A_FF00_N(cpu_t *p_cpu)
 
 static int opcode8_LD_C_A(cpu_t *p_cpu)
 {
-	*(p_cpu->mem + 0xFF00 + get_lsb(p_cpu->reg_BC)) = get_msb(p_cpu->reg_AF);
+	(void)mmu_write_u8(p_cpu->p_mmu, 0xFF00 + get_lsb(p_cpu->reg_BC), get_msb(p_cpu->reg_AF));
 
 	p_cpu->pc += 1;
 	return 8;
@@ -1062,7 +1188,10 @@ static int opcode8_LD_C_A(cpu_t *p_cpu)
 
 static int opcode8_LD_A_C(cpu_t *p_cpu)
 {
-	set_msb(&(p_cpu->reg_AF), *(p_cpu->mem + 0xFF00 + get_lsb(p_cpu->reg_BC)));
+	uint8_t a;
+	(void)mmu_read_u8(p_cpu->p_mmu, 0xFF00 + get_lsb(p_cpu->reg_BC), &a);
+
+	set_msb(&(p_cpu->reg_AF), a);
 
 	p_cpu->pc += 1;
 	return 8;
@@ -1070,11 +1199,10 @@ static int opcode8_LD_A_C(cpu_t *p_cpu)
 
 static int opcode8_LD_N_A(cpu_t *p_cpu)
 {
-	uint16_t n = *(p_cpu->pc + 2);
-	n <<= 8;
-	n |= *(p_cpu->pc + 1);
+	uint16_t n;
+	(void)mmu_read_u16(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
-	*(p_cpu->mem + n) = get_msb(p_cpu->reg_AF);
+	(void)mmu_write_u8(p_cpu->p_mmu, n, get_msb(p_cpu->reg_AF));
 
 	p_cpu->pc += 2;
 	return 8;
@@ -1082,11 +1210,13 @@ static int opcode8_LD_N_A(cpu_t *p_cpu)
 
 static int opcode8_LD_A_N(cpu_t *p_cpu)
 {
-	uint16_t n = *(p_cpu->pc + 2);
-	n <<= 8;
-	n |= *(p_cpu->pc + 1);
+	uint16_t n;
+	(void)mmu_read_u16(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
-	set_msb(&(p_cpu->reg_AF), *(p_cpu->mem + n));
+	uint8_t a;
+	(void)mmu_read_u8(p_cpu->p_mmu, n, &a);
+
+	set_msb(&(p_cpu->reg_AF), a);
 
 	p_cpu->pc += 2;
 	return 8;
@@ -1100,7 +1230,7 @@ static int opcode8_JP_HL(cpu_t *p_cpu)
 
 static int opcode8_LD_SP_HL(cpu_t *p_cpu)
 {
-	p_cpu->sp = p_cpu->mem + p_cpu->reg_HL;
+	p_cpu->sp = p_cpu->reg_HL;
 
 	p_cpu->pc += 2;
 	return 8;

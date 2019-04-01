@@ -1,6 +1,8 @@
 #ifndef CPU_BASE_H_
 #define CPU_BASE_H_
 
+#include "mmu.h"
+
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -13,13 +15,12 @@ typedef struct cpu_s
 	uint16_t reg_DE;
 	uint16_t reg_HL;
 
-	uint8_t *sp;
-	uint8_t *pc;
+	uint16_t sp;
+	uint16_t pc;
 
-	uint8_t *mem;
+	mmu_t *p_mmu;
 
-	uint8_t irq;
-	uint8_t irq_mask;
+	uint8_t irq_master_enable;
 
 	int di_counter;
 	int ei_counter;
