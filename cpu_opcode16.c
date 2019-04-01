@@ -2,6 +2,7 @@
 
 #include "cpu_opcode.h"
 #include "cpu_registers.h"
+#include "mmu.h"
 
 /* Defines */
 
@@ -80,14 +81,20 @@ int opcode16_handler(cpu_t *p_cpu)
     // Check whether opcode16 module was initialized.
     assert(opcode16_handlers[0] != NULL);
 
-    return opcode16_handlers[*(p_cpu->pc)](p_cpu);
+    uint8_t opcode;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &opcode);
+
+    return opcode16_handlers[opcode](p_cpu);
 }
 
 /* Private function definitions */
 
 static int opcode16_RLC_D(cpu_t *p_cpu)
 {
-    uint8_t d = *(p_cpu->pc + 1) & 0x07;
+    uint8_t d;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &d);
+    d &= 0x07;
+
     uint8_t dv = get_reg3(p_cpu, d);
 
     uint8_t flag_c = (dv >> 7) & 0x01;
@@ -106,15 +113,18 @@ static int opcode16_RLC_D(cpu_t *p_cpu)
 
 static int opcode16_RLC_HL(cpu_t *p_cpu)
 {
-    uint8_t *p_value = p_cpu->mem + p_cpu->reg_HL;
+    uint8_t value;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
-    uint8_t flag_c = (*p_value >> 7) & 0x01;
-    *p_value = (*p_value << 1) | flag_c;
+    uint8_t flag_c = (value >> 7) & 0x01;
+    value = (value << 1) | flag_c;
 
-    set_flag_Z(p_cpu, *p_value == 0);
+    set_flag_Z(p_cpu, value == 0);
     set_flag_N(p_cpu, 0);
     set_flag_H(p_cpu, 0);
     set_flag_C(p_cpu, flag_c);
+
+    (void)mmu_write_u8(p_cpu->p_mmu, p_cpu->reg_HL, value);
 
     p_cpu->pc += 2;
     return 16;
@@ -122,7 +132,10 @@ static int opcode16_RLC_HL(cpu_t *p_cpu)
 
 static int opcode16_RRC_D(cpu_t *p_cpu)
 {
-    uint8_t d = *(p_cpu->pc + 1) & 0x07;
+    uint8_t d;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &d);
+    d &= 0x07;
+
     uint8_t dv = get_reg3(p_cpu, d);
 
     uint8_t flag_c = dv & 0x01;
@@ -141,15 +154,18 @@ static int opcode16_RRC_D(cpu_t *p_cpu)
 
 static int opcode16_RRC_HL(cpu_t *p_cpu)
 {
-    uint8_t *p_value = p_cpu->mem + p_cpu->reg_HL;
+    uint8_t value;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
-    uint8_t flag_c = *p_value & 0x01;
-    *p_value = (*p_value >> 1) | (flag_c << 7);
+    uint8_t flag_c = value & 0x01;
+    value = (value >> 1) | (flag_c << 7);
 
-    set_flag_Z(p_cpu, *p_value == 0);
+    set_flag_Z(p_cpu, value == 0);
     set_flag_N(p_cpu, 0);
     set_flag_H(p_cpu, 0);
     set_flag_C(p_cpu, flag_c);
+
+    (void)mmu_write_u8(p_cpu->p_mmu, p_cpu->reg_HL, value);
 
     p_cpu->pc += 2;
     return 16;
@@ -157,7 +173,10 @@ static int opcode16_RRC_HL(cpu_t *p_cpu)
 
 static int opcode16_RL_D(cpu_t *p_cpu)
 {
-    uint8_t d = *(p_cpu->pc + 1) & 0x07;
+    uint8_t d;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &d);
+    d &= 0x07;
+
     uint8_t dv = get_reg3(p_cpu, d);
 
     uint8_t flag_c = (dv >> 7) & 0x01;
@@ -176,15 +195,18 @@ static int opcode16_RL_D(cpu_t *p_cpu)
 
 static int opcode16_RL_HL(cpu_t *p_cpu)
 {
-    uint8_t *p_value = p_cpu->mem + p_cpu->reg_HL;
+    uint8_t value;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
-    uint8_t flag_c = (*p_value >> 7) & 0x01;
-    *p_value = (*p_value << 1) | get_flag_C(p_cpu);
+    uint8_t flag_c = (value >> 7) & 0x01;
+    value = (value << 1) | get_flag_C(p_cpu);
 
-    set_flag_Z(p_cpu, *p_value == 0);
+    set_flag_Z(p_cpu, value == 0);
     set_flag_N(p_cpu, 0);
     set_flag_H(p_cpu, 0);
     set_flag_C(p_cpu, flag_c);
+
+    (void)mmu_write_u8(p_cpu->p_mmu, p_cpu->reg_HL, value);
 
     p_cpu->pc += 2;
     return 16;
@@ -192,7 +214,10 @@ static int opcode16_RL_HL(cpu_t *p_cpu)
 
 static int opcode16_RR_D(cpu_t *p_cpu)
 {
-    uint8_t d = *(p_cpu->pc + 1) & 0x07;
+    uint8_t d;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &d);
+    d &= 0x07;
+
     uint8_t dv = get_reg3(p_cpu, d);
 
     uint8_t flag_c = dv & 0x01;
@@ -211,15 +236,18 @@ static int opcode16_RR_D(cpu_t *p_cpu)
 
 static int opcode16_RR_HL(cpu_t *p_cpu)
 {
-    uint8_t *p_value = p_cpu->mem + p_cpu->reg_HL;
+    uint8_t value;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
-    uint8_t flag_c = *p_value & 0x01;
-    *p_value = (*p_value >> 1) | (get_flag_C(p_cpu) << 7);
+    uint8_t flag_c = value & 0x01;
+    value = (value >> 1) | (get_flag_C(p_cpu) << 7);
 
-    set_flag_Z(p_cpu, *p_value == 0);
+    set_flag_Z(p_cpu, value == 0);
     set_flag_N(p_cpu, 0);
     set_flag_H(p_cpu, 0);
     set_flag_C(p_cpu, flag_c);
+
+    (void)mmu_write_u8(p_cpu->p_mmu, p_cpu->reg_HL, value);
 
     p_cpu->pc += 2;
     return 16;
@@ -228,7 +256,10 @@ static int opcode16_RR_HL(cpu_t *p_cpu)
 //Shift left into Carry. LSB of n set to 0.
 static int opcode16_SLA_D(cpu_t *p_cpu)
 {
-    uint8_t d = *(p_cpu->pc + 1) & 0x07;
+    uint8_t d;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &d);
+    d &= 0x07;
+
     uint8_t dv = get_reg3(p_cpu, d);
 
     uint8_t flag_c = (dv >> 7) & 0x01;
@@ -248,15 +279,18 @@ static int opcode16_SLA_D(cpu_t *p_cpu)
 //Shift left into Carry. LSB of n set to 0.
 static int opcode16_SLA_HL(cpu_t *p_cpu)
 {
-    uint8_t *p_value = p_cpu->mem + p_cpu->reg_HL;
+    uint8_t value;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
-    uint8_t flag_c = (*p_value >> 7) & 0x01;
-    *p_value = (*p_value << 1) & 0xFE;
+    uint8_t flag_c = (value >> 7) & 0x01;
+    value = (value << 1) & 0xFE;
 
-    set_flag_Z(p_cpu, *p_value == 0);
+    set_flag_Z(p_cpu, value == 0);
     set_flag_N(p_cpu, 0);
     set_flag_H(p_cpu, 0);
     set_flag_C(p_cpu, flag_c);
+
+    (void)mmu_write_u8(p_cpu->p_mmu, p_cpu->reg_HL, value);
 
     p_cpu->pc += 2;
     return 16;
@@ -265,7 +299,10 @@ static int opcode16_SLA_HL(cpu_t *p_cpu)
 //Shift right into Carry. MSB doesn't change.
 static int opcode16_SRA_D(cpu_t *p_cpu)
 {
-    uint8_t d = *(p_cpu->pc + 1) & 0x07;
+    uint8_t d;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &d);
+    d &= 0x07;
+
     uint8_t dv = get_reg3(p_cpu, d);
 
     uint8_t flag_c = dv & 0x01;
@@ -285,15 +322,18 @@ static int opcode16_SRA_D(cpu_t *p_cpu)
 //Shift right into Carry. MSB doesn't change.
 static int opcode16_SRA_HL(cpu_t *p_cpu)
 {
-    uint8_t *p_value = p_cpu->mem + p_cpu->reg_HL;
+    uint8_t value;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
-    uint8_t flag_c = *p_value & 0x01;
-    *p_value = (*p_value & 0x80) | ((*p_value >> 1) & 0x7F);
+    uint8_t flag_c = value & 0x01;
+    value = (value & 0x80) | ((value >> 1) & 0x7F);
 
-    set_flag_Z(p_cpu, *p_value == 0);
+    set_flag_Z(p_cpu, value == 0);
     set_flag_N(p_cpu, 0);
     set_flag_H(p_cpu, 0);
     set_flag_C(p_cpu, flag_c);
+
+    (void)mmu_write_u8(p_cpu->p_mmu, p_cpu->reg_HL, value);
 
     p_cpu->pc += 2;
     return 16;
@@ -302,7 +342,10 @@ static int opcode16_SRA_HL(cpu_t *p_cpu)
 //Swap upper & lower nibles
 static int opcode16_SWAP_D(cpu_t *p_cpu)
 {
-    uint8_t d = *(p_cpu->pc + 1) & 0x07;
+    uint8_t d;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &d);
+    d &= 0x07;
+
     uint8_t dv = get_reg3(p_cpu, d);
 
     dv = ((dv << 4) & 0xF0) | ((dv >> 4) & 0x0F);
@@ -321,14 +364,17 @@ static int opcode16_SWAP_D(cpu_t *p_cpu)
 //Swap upper & lower nibles
 static int opcode16_SWAP_HL(cpu_t *p_cpu)
 {
-    uint8_t *p_value = p_cpu->mem + p_cpu->reg_HL;
+    uint8_t value;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
-    *p_value = ((*p_value << 4) & 0xF0) | ((*p_value >> 4) & 0x0F);
+    value = ((value << 4) & 0xF0) | ((value >> 4) & 0x0F);
 
-    set_flag_Z(p_cpu, *p_value == 0);
+    set_flag_Z(p_cpu, value == 0);
     set_flag_N(p_cpu, 0);
     set_flag_H(p_cpu, 0);
     set_flag_C(p_cpu, 0);
+
+    (void)mmu_write_u8(p_cpu->p_mmu, p_cpu->reg_HL, value);
 
     p_cpu->pc += 2;
     return 16;
@@ -337,7 +383,10 @@ static int opcode16_SWAP_HL(cpu_t *p_cpu)
 //Shift right into Carry. MSB set to 0.
 static int opcode16_SRL_D(cpu_t *p_cpu)
 {
-    uint8_t d = *(p_cpu->pc + 1) & 0x07;
+    uint8_t d;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &d);
+    d &= 0x07;
+
     uint8_t dv = get_reg3(p_cpu, d);
 
     uint8_t flag_c = dv & 0x01;
@@ -360,15 +409,18 @@ static int opcode16_SRL_D(cpu_t *p_cpu)
 //Shift right into Carry. MSB set to 0.
 static int opcode16_SRL_HL(cpu_t *p_cpu)
 {
-    uint8_t *p_value = p_cpu->mem + p_cpu->reg_HL;
+    uint8_t value;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
-    uint8_t flag_c = *p_value & 0x01;
-    *p_value = (*p_value >> 1) & 0x7F;
+    uint8_t flag_c = value & 0x01;
+    value = (value >> 1) & 0x7F;
 
-    set_flag_Z(p_cpu, *p_value == 0);
+    set_flag_Z(p_cpu, value == 0);
     set_flag_N(p_cpu, 0);
     set_flag_H(p_cpu, 0);
     set_flag_C(p_cpu, flag_c);
+
+    (void)mmu_write_u8(p_cpu->p_mmu, p_cpu->reg_HL, value);
 
     p_cpu->pc += 2;
     return 16;
@@ -377,10 +429,13 @@ static int opcode16_SRL_HL(cpu_t *p_cpu)
 //Test bit n in register d.
 static int opcode16_BIT_N_D(cpu_t *p_cpu)
 {
-    uint8_t n = (*(p_cpu->pc + 1) >> 3) & 0x07;
+    uint8_t opcode;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &opcode);
+
+    uint8_t n = (opcode >> 3) & 0x07;
     uint8_t mask = 1 << n;
 
-    uint8_t d = *(p_cpu->pc + 1) & 0x07;
+    uint8_t d = opcode & 0x07;
     uint8_t dv = get_reg3(p_cpu, d);
 
     set_flag_Z(p_cpu, (dv ^ mask) >> n);
@@ -394,12 +449,16 @@ static int opcode16_BIT_N_D(cpu_t *p_cpu)
 //Test bit n in register d.
 static int opcode16_BIT_N_HL(cpu_t *p_cpu)
 {
-    uint8_t n = (*(p_cpu->pc + 1) >> 3) & 0x07;
+    uint8_t opcode;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &opcode);
+
+    uint8_t n = (opcode >> 3) & 0x07;
     uint8_t mask = 1 << n;
 
-    const uint8_t *p_value = p_cpu->mem + p_cpu->reg_HL;
+    uint8_t value;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
-    set_flag_Z(p_cpu, (*p_value ^ mask) >> n);
+    set_flag_Z(p_cpu, (value ^ mask) >> n);
     set_flag_N(p_cpu, 0);
     set_flag_H(p_cpu, 1);
 
@@ -410,10 +469,13 @@ static int opcode16_BIT_N_HL(cpu_t *p_cpu)
 //Reset bit n in register d.
 static int opcode16_RES_N_D(cpu_t *p_cpu)
 {
-    uint8_t n = (*(p_cpu->pc + 1) >> 3) & 0x07;
+    uint8_t opcode;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &opcode);
+
+    uint8_t n = (opcode >> 3) & 0x07;
     uint8_t mask = ~(1 << n);
 
-    uint8_t d = *(p_cpu->pc + 1) & 0x07;
+    uint8_t d = opcode & 0x07;
     uint8_t dv = get_reg3(p_cpu, d);
 
     dv &= mask;
@@ -427,12 +489,18 @@ static int opcode16_RES_N_D(cpu_t *p_cpu)
 //Reset bit n in register d.
 static int opcode16_RES_N_HL(cpu_t *p_cpu)
 {
-    uint8_t n = (*(p_cpu->pc + 1) >> 3) & 0x07;
+    uint8_t opcode;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &opcode);
+
+    uint8_t n = (opcode >> 3) & 0x07;
     uint8_t mask = ~(1 << n);
 
-    uint8_t *p_value = p_cpu->mem + p_cpu->reg_HL;
+    uint8_t value;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
-    *p_value &= mask;
+    value &= mask;
+
+    (void)mmu_write_u8(p_cpu->p_mmu, p_cpu->reg_HL, value);
 
     p_cpu->pc += 2;
     return 16;
@@ -441,10 +509,13 @@ static int opcode16_RES_N_HL(cpu_t *p_cpu)
 //Set bit n in register d.
 static int opcode16_SET_N_D(cpu_t *p_cpu)
 {
-    uint8_t n = (*(p_cpu->pc + 1) >> 3) & 0x07;
+    uint8_t opcode;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &opcode);
+
+    uint8_t n = (opcode >> 3) & 0x07;
     uint8_t mask = 1 << n;
 
-    uint8_t d = *(p_cpu->pc + 1) & 0x07;
+    uint8_t d = opcode & 0x07;
     uint8_t dv = get_reg3(p_cpu, d);
 
     dv |= mask;
@@ -458,12 +529,18 @@ static int opcode16_SET_N_D(cpu_t *p_cpu)
 //Set bit n in register d.
 static int opcode16_SET_N_HL(cpu_t *p_cpu)
 {
-    uint8_t n = (*(p_cpu->pc + 1) >> 3) & 0x07;
+    uint8_t opcode;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &opcode);
+
+    uint8_t n = (opcode >> 3) & 0x07;
     uint8_t mask = 1 << n;
 
-    uint8_t *p_value = p_cpu->mem + p_cpu->reg_HL;
+    uint8_t value;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
-    *p_value |= mask;
+    value |= mask;
+
+    (void)mmu_write_u8(p_cpu->p_mmu, p_cpu->reg_HL, value);
 
     p_cpu->pc += 2;
     return 16;

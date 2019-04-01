@@ -103,12 +103,13 @@ static inline uint8_t get_flag_C(cpu_t *p_cpu)
 static inline void push_u8(cpu_t *p_cpu, uint8_t u8)
 {
     p_cpu->sp -= 1;
-    *p_cpu->sp = u8;
+    (void)mmu_write_u8(p_cpu->p_mmu, p_cpu->sp, u8);
 }
 
 static inline uint8_t pop_u8(cpu_t *p_cpu)
 {
-    uint8_t u8 = *p_cpu->sp;
+    uint8_t u8;
+    (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->sp, &u8);
     p_cpu->sp += 1;
     return u8;
 }
@@ -129,17 +130,17 @@ static inline uint16_t pop_u16(cpu_t *p_cpu)
 
 static inline void push_pc(cpu_t *p_cpu)
 {
-    push_u16(p_cpu, p_cpu->pc - p_cpu->mem);
+    push_u16(p_cpu, p_cpu->pc);
 }
 
 static inline void pop_pc(cpu_t *p_cpu)
 {
-    p_cpu->pc = p_cpu->mem + pop_u16(p_cpu);
+    p_cpu->pc = pop_u16(p_cpu);
 }
 
 static inline void jump(cpu_t *p_cpu, uint16_t addr)
 {
-    p_cpu->pc = p_cpu->mem + addr;
+    p_cpu->pc = addr;
 }
 
 /* Register accessors */
@@ -214,7 +215,7 @@ static inline void set_reg2(cpu_t *p_cpu, reg2_t r, uint16_t value)
         p_cpu->reg_HL = value;
         break;
     case REG2_SP:
-        p_cpu->sp = p_cpu->mem + value;
+        p_cpu->sp = value;
         break;
     default:
         assert(0);
@@ -233,7 +234,7 @@ static inline uint16_t get_reg2(cpu_t *p_cpu, reg2_t r)
     case REG2_HL:
         return p_cpu->reg_HL;
     case REG2_SP:
-        return p_cpu->sp - p_cpu->mem;
+        return p_cpu->sp;
     default:
         assert(0);
         return 0;
@@ -254,7 +255,7 @@ static inline void set_reg1(cpu_t *p_cpu, reg1_t r, uint16_t value)
         p_cpu->reg_HL = value;
         break;
     case REG1_PC:
-        p_cpu->pc = p_cpu->mem + value;
+        p_cpu->pc = value;
         break;
     default:
         assert(0);
@@ -273,7 +274,7 @@ static inline uint16_t get_reg1(cpu_t *p_cpu, reg1_t r)
     case REG1_HL:
         return p_cpu->reg_HL;
     case REG1_PC:
-        return p_cpu->pc - p_cpu->mem;
+        return p_cpu->pc;
     default:
         assert(0);
         return 0;
