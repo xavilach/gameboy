@@ -82,22 +82,22 @@ int cpu_run(cpu_t *p_cpu)
 		(void)mmu_read_u8(p_cpu->p_mmu, IF_REG_ADDR, &irq_flag);
 		(void)mmu_read_u8(p_cpu->p_mmu, IE_REG_ADDR, &irq_enable);
 
-		irq_flag &= irq_enable; // Mask disabled irqs.
+		irq_flag &= (irq_enable & 0x1F); // Mask disabled irqs.
 
 		if (irq_flag)
 		{
-			p_cpu->irq_master_enable = 0; // Disable interrupts.
-
-			push_pc(p_cpu); //Push PC on stack.
-
 			for (int i = 0; i < IRQ_COUNT; i++)
 			{
 				uint8_t mask = 1 << i;
 				if (mask & irq_flag)
 				{
-					irq_flag &= ~mask; // Clear interrupt flag.
+					push_pc(p_cpu); //Push PC on stack.
+
+					p_cpu->irq_master_enable = 0; // Disable interrupts.
+					irq_flag &= ~mask;			  // Clear interrupt flag.
 
 					jump(p_cpu, VECTOR_TABLE[i]);
+					break;
 				}
 			}
 		}
