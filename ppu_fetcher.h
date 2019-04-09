@@ -51,21 +51,23 @@ static inline void fetch(ppu_fetcher_t *p_fetcher, mmu_t *p_mmu, ppu_fifo_t *p_f
         return;
     }
 
+    uint16_t address;
+
     switch (p_fetcher->state)
     {
     case FETCHER_GET_TILE:
-        uint16_t map_address = p_fetcher->map_address + (p_fetcher->y * 32) + p_fetcher->x;
-        (void)mmu_read_u8(p_mmu, map_address, &p_fetcher->tile.index);
+        address = p_fetcher->map_address + (p_fetcher->y * 32) + p_fetcher->x;
+        (void)mmu_read_u8(p_mmu, address, &p_fetcher->tile.index);
         p_fetcher->state = FETCHER_GET_DATA_0;
         break;
     case FETCHER_GET_DATA_0:
-        uint16_t tile_address = p_fetcher->tiles_address + (p_fetcher->tile.index * sizeof(uint16_t));
-        (void)mmu_read_u8(p_mmu, tile_address, &p_fetcher->tile.data[0]);
+        address = p_fetcher->tiles_address + (p_fetcher->tile.index * sizeof(uint16_t));
+        (void)mmu_read_u8(p_mmu, address, &p_fetcher->tile.data[0]);
         p_fetcher->state = FETCHER_GET_DATA_1;
         break;
     case FETCHER_GET_DATA_1:
-        uint16_t tile_address = p_fetcher->tiles_address + (p_fetcher->tile.index * sizeof(uint16_t)) + 1;
-        (void)mmu_read_u8(p_mmu, tile_address, &p_fetcher->tile.data[1]);
+        address = p_fetcher->tiles_address + (p_fetcher->tile.index * sizeof(uint16_t)) + 1;
+        (void)mmu_read_u8(p_mmu, address, &p_fetcher->tile.data[1]);
         p_fetcher->state = FETCHER_WAIT;
         break;
     case FETCHER_WAIT:

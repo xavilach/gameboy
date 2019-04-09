@@ -2,7 +2,9 @@
 #define PPU_BASE_H_
 
 #include "ppu_fetcher.h"
+#include "ppu_fifo.h"
 #include "lcd.h"
+#include "mmu.h"
 
 #include <stdint.h>
 
@@ -85,17 +87,9 @@ typedef struct ppu_s
     ppu_fetcher_t *fetcher;
 
     /*
-    int pixel_index;
-
     sprite_t visible_sprites[10];
-
     int sprite_height;
-
-    uint8_t scroll_x;
-    uint8_t scroll_y;
-    uint8_t line_y;
     uint8_t line_y_compare;
-    uint8_t column_x;
     */
 } ppu_t;
 
@@ -107,8 +101,12 @@ static inline uint8_t get_color(uint8_t palette_color)
 
 static inline void update_palettes(ppu_t *p_ppu)
 {
-    uint8_t bgp = p_ppu->mem[0xFF47];
-    uint8_t obp[2] = {p_ppu->mem[0xFF48], p_ppu->mem[0xFF49]};
+    uint8_t bgp;
+    (void)mmu_read_u8(p_ppu->mmu, 0xFF47, &bgp);
+
+    uint8_t obp[2];
+    (void)mmu_read_u8(p_ppu->mmu, 0xFF48, &obp[0]);
+    (void)mmu_read_u8(p_ppu->mmu, 0xFF49, &obp[1]);
 
     for (int i = 0; i < 4; i++)
     {
@@ -118,15 +116,16 @@ static inline void update_palettes(ppu_t *p_ppu)
     }
 }
 
-static inline window_t get_window(ppu_t *p_ppu)
+static inline void update_window(ppu_t *p_ppu)
 {
-    window_t window;
+    uint8_t lcdc, wx, wy;
+    (void)mmu_read_u8(p_ppu->mmu, 0xFF40, &lcdc);
+    (void)mmu_read_u8(p_ppu->mmu, 0xFF4A, &wy);
+    (void)mmu_read_u8(p_ppu->mmu, 0xFF4B, &wx);
 
-    window.enabled = (0 != ((p_ppu->mem[0xFF40] >> 5) & 0x01));
-    window.x = p_ppu->mem[0xFF4B];
-    window.y = p_ppu->mem[0xFF4A];
-
-    return window;
+    p_ppu->window.enabled = (0 != ((lcdc >> 5) & 0x01));
+    p_ppu->window.x = wx;
+    p_ppu->window.y = wy;
 }
 
 #endif /*PPU_BASE_H_*/

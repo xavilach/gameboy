@@ -3,6 +3,7 @@
 #include "ppu_base.h"
 
 #include <stdint.h>
+#include <stdlib.h>
 
 ppu_t *ppu_allocate(mmu_t *p_mmu, lcd_t *p_lcd)
 {
