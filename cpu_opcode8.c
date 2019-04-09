@@ -232,7 +232,7 @@ static int opcode8_LD_R_N(cpu_t *p_cpu)
 	r >>= 4;
 	r &= 0x03;
 
-	uint8_t n;
+	uint16_t n;
 	(void)mmu_read_u16(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
 	set_reg2(p_cpu, r, n);
@@ -286,7 +286,7 @@ static int opcode8_LD_A_R(cpu_t *p_cpu)
 	uint16_t rv = get_reg2(p_cpu, r);
 
 	uint8_t a;
-	(void)mmu_read_u8(p_cpu->p_mmu, rv, a);
+	(void)mmu_read_u8(p_cpu->p_mmu, rv, &a);
 
 	set_msb(&(p_cpu->reg_AF), a);
 

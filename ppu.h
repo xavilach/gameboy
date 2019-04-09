@@ -4,6 +4,8 @@
 #include "mmu.h"
 #include "lcd.h"
 
+typedef struct ppu_s ppu_t;
+
 /* Pixel Processing Unit.
 160 * 144 PIxels
 4 Shades of Grey
@@ -72,6 +74,6 @@ Fetcher
 
 ppu_t *ppu_allocate(mmu_t *p_mmu, lcd_t *p_lcd);
 
-void ppu_cycle(void);
+void ppu_cycle(ppu_t *p_ppu);
 
 #endif /*PPU_H_*/
