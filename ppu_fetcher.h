@@ -3,6 +3,7 @@
 
 #include "ppu_fifo.h"
 #include "mmu.h"
+#include "log.h"
 
 #include <stdint.h>
 
