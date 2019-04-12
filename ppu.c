@@ -1,6 +1,7 @@
 #include "ppu.h"
 
 #include "ppu_base.h"
+#include "log.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -25,6 +26,11 @@ void ppu_cycle(ppu_t *p_ppu)
 {
     p_ppu->status.cycles += 1;
 
+    set_enabled(p_ppu);
+
+    if (!p_ppu->status.enabled)
+        return;
+
     switch (p_ppu->status.mode)
     {
     case PPU_MODE_OAM_SEARCH:
@@ -33,24 +39,36 @@ void ppu_cycle(ppu_t *p_ppu)
 
         //cpu cannot access oam
 
-        if (20 == p_ppu->status.cycles)
+        if (p_ppu->status.cycles >= 20 * 40)
         {
+            update_palettes(p_ppu);
+            update_viewport(p_ppu);
+            update_window(p_ppu);
+            update_background(p_ppu);
+
             p_ppu->status.cycles = 0;
             p_ppu->status.mode = PPU_MODE_PIXEL_TRANSFER;
             p_ppu->status.pixel_index = 0;
+
+            p_ppu->fetcher.cycles = 0;
+            p_ppu->fetcher.mode = FETCHER_GET_TILE;
+            p_ppu->fetcher.map_address = p_ppu->background.map_address;
+            p_ppu->fetcher.tiles_address = p_ppu->background.tiles_address;
+            p_ppu->fetcher.x = 0;
+            p_ppu->fetcher.y = p_ppu->status.line_y + p_ppu->viewport.y;
         }
         break;
     case PPU_MODE_PIXEL_TRANSFER:
         //cpu cannot access vram
         //cpu cannot access oam
 
-        fetch(p_ppu->fetcher, p_ppu->mmu, p_ppu->fifo);
+        fetch(&p_ppu->fetcher, p_ppu->mmu, &p_ppu->fifo);
 
-        if (p_ppu->fifo->count > 8)
+        if ((p_ppu->fifo.count > 8) && (p_ppu->status.pixel_index < 160))
         {
             //more than 8 pixels, pop pixel from fifo.
             pixel_data_t data;
-            if (0 == ppu_fifo_pop(p_ppu->fifo, &data))
+            if (0 == ppu_fifo_pop(&p_ppu->fifo, &data))
             {
                 if (p_ppu->viewport.x > 0)
                 {
@@ -60,25 +78,37 @@ void ppu_cycle(ppu_t *p_ppu)
                 else
                 {
                     // Shift pixel to LCD.
-                    p_ppu->lcd->pixels[p_ppu->status.pixel_index] = p_ppu->bg_palette.color[data.data];
-                    p_ppu->status.pixel_index++;
-                }
+                    int index = p_ppu->status.line_y * 160;
+                    index += p_ppu->status.pixel_index;
 
-                if (0 == (p_ppu->status.pixel_index % 160))
-                {
-                    //Finished LCD line
-                    //Trigger HBLANK IRQ (STAT).
-                    p_ppu->status.mode = PPU_MODE_H_BLANK;
+                    p_ppu->lcd->last_x = p_ppu->status.pixel_index;
+                    p_ppu->lcd->last_y = p_ppu->status.line_y;
+
+                    if (index < (160 * 144))
+                    {
+                        p_ppu->lcd->pixels[index] = p_ppu->bg_palette.color[data.data];
+                    }
+                    p_ppu->status.pixel_index++;
                 }
             }
         }
+
+        if (p_ppu->status.pixel_index >= 160)
+        {
+            //Finished LCD line
+            //Trigger HBLANK IRQ (STAT).
+            p_ppu->status.mode = PPU_MODE_H_BLANK;
+        }
         break;
     case PPU_MODE_H_BLANK:
-        if ((43 + 51) == p_ppu->status.cycles)
+        if (p_ppu->status.cycles >= (43 + 51) * 4)
         {
             p_ppu->status.cycles = 0;
             p_ppu->status.line_y += 1;
-            if (144 == p_ppu->status.line_y)
+
+            update_lineY(p_ppu);
+
+            if (p_ppu->status.line_y >= 144)
             {
                 // Trigger VBLANK IRQ.
                 //Trigger VBLANK IRQ (STAT).
@@ -89,21 +119,42 @@ void ppu_cycle(ppu_t *p_ppu)
                 //Trigger OAM IRQ (STAT).
                 p_ppu->status.mode = PPU_MODE_OAM_SEARCH;
             }
+
+            DEBUG_PRINT("New line %d\n", p_ppu->status.line_y);
         }
         break;
     case PPU_MODE_V_BLANK:
-        if (114 == p_ppu->status.cycles)
+        if (p_ppu->status.cycles >= 114 * 4)
         {
             p_ppu->status.cycles = 0;
             p_ppu->status.line_y += 1;
-            if (154 == p_ppu->status.line_y)
+
+            update_lineY(p_ppu);
+
+            if (p_ppu->status.line_y >= 154)
             {
                 p_ppu->status.line_y = 0;
                 //Trigger OAM IRQ (STAT).
                 p_ppu->status.mode = PPU_MODE_OAM_SEARCH;
             }
+
+            DEBUG_PRINT("New line %d\n", p_ppu->status.line_y);
         }
         break;
+    }
+}
+
+uint8_t ppu_get_pixel(ppu_t *p_ppu, int x, int y)
+{
+    int index = y * 160 + x;
+
+    if (index < (160 * 144))
+    {
+        return p_ppu->lcd->pixels[index];
+    }
+    else
+    {
+        return 0;
     }
 }
 
@@ -113,21 +164,13 @@ static void ppu_update(ppu_t *p_ppu)
     uint8_t lcdc = p_ppu->mem[0xFF40];
 
     p_ppu->enable = ((lcdc >> 7) & 0x01) ? 1 : 0;
-    p_ppu->window_tile_map = ((lcdc >> 6) & 0x01) ? 0x9C00 : 0x9800; // 32 * 32 indexes (1k)
-    p_ppu->window_enable = ((lcdc >> 5) & 0x01) ? 1 : 0;
-    p_ppu->window_bg_tile_data = ((lcdc >> 4) & 0x01) ? 0x8000 : 0x8800; // 256 tiles * 16 bytes (4k)
-    p_ppu->bg_tile_map = ((lcdc >> 3) & 0x01) ? 0x9C00 : 0x9800;         // 32 * 32 indexes (1k)
     p_ppu->sprite_height = ((lcdc >> 2) & 0x01) ? 16 : 8;
     p_ppu->sprite_enable = ((lcdc >> 1) & 0x01) ? 1 : 0;
-    p_ppu->bg_window_enable = ((lcdc >> 0) & 0x01) ? 1 : 0;
-
+    
     // sprites_tile_data = 0x8000;
 
     uint8_t stat = p_ppu->mem[0xFF41];
 
-    p_ppu->scroll_y = p_ppu->mem[0xFF42];
-    p_ppu->scroll_x = p_ppu->mem[0xFF43];
-    p_ppu->mem[0xFF44] = p_ppu->line_y;
     p_ppu->line_y_compare = p_ppu->mem[0xFF46];
 
     int i, j;

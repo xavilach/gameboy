@@ -19,12 +19,18 @@
 0xFF80 - 0xFFFF HRAM
 */
 
-typedef struct mmu_s mmu_t;
+typedef struct mmu_s
+{
+    uint8_t *boot;
+    uint8_t *mem;
+} mmu_t;
+
+//typedef struct mmu_s mmu_t;
 
 mmu_t *mmu_allocate(void);
 
-int mmu_read(mmu_t *p_mmu, uint16_t address, uint8_t *data, uint16_t size);
-int mmu_write(mmu_t *p_mmu, uint16_t address, uint8_t *data, uint16_t size);
+int mmu_load_boot(mmu_t *p_mmu, char *path);
+int mmu_load_rom(mmu_t *p_mmu, char *path);
 
 int mmu_read_u8(mmu_t *p_mmu, uint16_t address, uint8_t *data);
 int mmu_write_u8(mmu_t *p_mmu, uint16_t address, uint8_t data);

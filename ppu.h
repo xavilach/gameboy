@@ -76,4 +76,6 @@ ppu_t *ppu_allocate(mmu_t *p_mmu, lcd_t *p_lcd);
 
 void ppu_cycle(ppu_t *p_ppu);
 
+uint8_t ppu_get_pixel(ppu_t *p_ppu, int x, int y);
+
 #endif /*PPU_H_*/
