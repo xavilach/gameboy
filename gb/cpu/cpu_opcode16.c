@@ -3,7 +3,6 @@
 #include "cpu_opcode.h"
 #include "cpu_registers.h"
 #include "mmu.h"
-#include "log.h"
 
 /* Defines */
 
@@ -92,7 +91,7 @@ int opcode16_handler(cpu_t *p_cpu)
 
 static int opcode16_RLC_D(cpu_t *p_cpu)
 {
-    DEBUG_PRINT("%04x:RLC D\n", p_cpu->pc);
+    //DEBUG_PRINT("%04x:RLC D\n", p_cpu->pc);
     uint8_t d;
     (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &d);
     d &= 0x07;
@@ -115,7 +114,7 @@ static int opcode16_RLC_D(cpu_t *p_cpu)
 
 static int opcode16_RLC_HL(cpu_t *p_cpu)
 {
-    DEBUG_PRINT("%04x:RLC HL\n", p_cpu->pc);
+    //DEBUG_PRINT("%04x:RLC HL\n", p_cpu->pc);
     uint8_t value;
     (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
@@ -135,7 +134,7 @@ static int opcode16_RLC_HL(cpu_t *p_cpu)
 
 static int opcode16_RRC_D(cpu_t *p_cpu)
 {
-    DEBUG_PRINT("%04x:RRC D\n", p_cpu->pc);
+    //DEBUG_PRINT("%04x:RRC D\n", p_cpu->pc);
     uint8_t d;
     (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &d);
     d &= 0x07;
@@ -158,7 +157,7 @@ static int opcode16_RRC_D(cpu_t *p_cpu)
 
 static int opcode16_RRC_HL(cpu_t *p_cpu)
 {
-    DEBUG_PRINT("%04x:RRC HL\n", p_cpu->pc);
+    //DEBUG_PRINT("%04x:RRC HL\n", p_cpu->pc);
     uint8_t value;
     (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
@@ -178,7 +177,7 @@ static int opcode16_RRC_HL(cpu_t *p_cpu)
 
 static int opcode16_RL_D(cpu_t *p_cpu)
 {
-    DEBUG_PRINT("%04x:RL D\n", p_cpu->pc);
+    //DEBUG_PRINT("%04x:RL D\n", p_cpu->pc);
     uint8_t d;
     (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &d);
     d &= 0x07;
@@ -201,7 +200,7 @@ static int opcode16_RL_D(cpu_t *p_cpu)
 
 static int opcode16_RL_HL(cpu_t *p_cpu)
 {
-    DEBUG_PRINT("%04x:RL HL\n", p_cpu->pc);
+    //DEBUG_PRINT("%04x:RL HL\n", p_cpu->pc);
     uint8_t value;
     (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
@@ -221,7 +220,7 @@ static int opcode16_RL_HL(cpu_t *p_cpu)
 
 static int opcode16_RR_D(cpu_t *p_cpu)
 {
-    DEBUG_PRINT("%04x:RR D\n", p_cpu->pc);
+    //DEBUG_PRINT("%04x:RR D\n", p_cpu->pc);
     uint8_t d;
     (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &d);
     d &= 0x07;
@@ -244,7 +243,7 @@ static int opcode16_RR_D(cpu_t *p_cpu)
 
 static int opcode16_RR_HL(cpu_t *p_cpu)
 {
-    DEBUG_PRINT("%04x:RR HL\n", p_cpu->pc);
+    //DEBUG_PRINT("%04x:RR HL\n", p_cpu->pc);
     uint8_t value;
     (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
@@ -265,7 +264,7 @@ static int opcode16_RR_HL(cpu_t *p_cpu)
 //Shift left into Carry. LSB of n set to 0.
 static int opcode16_SLA_D(cpu_t *p_cpu)
 {
-    DEBUG_PRINT("%04x:SLA D\n", p_cpu->pc);
+    //DEBUG_PRINT("%04x:SLA D\n", p_cpu->pc);
     uint8_t d;
     (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &d);
     d &= 0x07;
@@ -289,7 +288,7 @@ static int opcode16_SLA_D(cpu_t *p_cpu)
 //Shift left into Carry. LSB of n set to 0.
 static int opcode16_SLA_HL(cpu_t *p_cpu)
 {
-    DEBUG_PRINT("%04x:SLA HL\n", p_cpu->pc);
+    //DEBUG_PRINT("%04x:SLA HL\n", p_cpu->pc);
     uint8_t value;
     (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
@@ -310,7 +309,7 @@ static int opcode16_SLA_HL(cpu_t *p_cpu)
 //Shift right into Carry. MSB doesn't change.
 static int opcode16_SRA_D(cpu_t *p_cpu)
 {
-    DEBUG_PRINT("%04x:SRA D\n", p_cpu->pc);
+    //DEBUG_PRINT("%04x:SRA D\n", p_cpu->pc);
     uint8_t d;
     (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &d);
     d &= 0x07;
@@ -334,7 +333,7 @@ static int opcode16_SRA_D(cpu_t *p_cpu)
 //Shift right into Carry. MSB doesn't change.
 static int opcode16_SRA_HL(cpu_t *p_cpu)
 {
-    DEBUG_PRINT("%04x:SRA HL\n", p_cpu->pc);
+    //DEBUG_PRINT("%04x:SRA HL\n", p_cpu->pc);
     uint8_t value;
     (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
@@ -355,7 +354,7 @@ static int opcode16_SRA_HL(cpu_t *p_cpu)
 //Swap upper & lower nibles
 static int opcode16_SWAP_D(cpu_t *p_cpu)
 {
-    DEBUG_PRINT("%04x:SWAP D\n", p_cpu->pc);
+    //DEBUG_PRINT("%04x:SWAP D\n", p_cpu->pc);
     uint8_t d;
     (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &d);
     d &= 0x07;
@@ -378,7 +377,7 @@ static int opcode16_SWAP_D(cpu_t *p_cpu)
 //Swap upper & lower nibles
 static int opcode16_SWAP_HL(cpu_t *p_cpu)
 {
-    DEBUG_PRINT("%04x:SWAP HL\n", p_cpu->pc);
+    //DEBUG_PRINT("%04x:SWAP HL\n", p_cpu->pc);
     uint8_t value;
     (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
@@ -398,7 +397,7 @@ static int opcode16_SWAP_HL(cpu_t *p_cpu)
 //Shift right into Carry. MSB set to 0.
 static int opcode16_SRL_D(cpu_t *p_cpu)
 {
-    DEBUG_PRINT("%04x:SRL D\n", p_cpu->pc);
+    //DEBUG_PRINT("%04x:SRL D\n", p_cpu->pc);
     uint8_t d;
     (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &d);
     d &= 0x07;
@@ -425,7 +424,7 @@ static int opcode16_SRL_D(cpu_t *p_cpu)
 //Shift right into Carry. MSB set to 0.
 static int opcode16_SRL_HL(cpu_t *p_cpu)
 {
-    DEBUG_PRINT("%04x:SRL HL\n", p_cpu->pc);
+    //DEBUG_PRINT("%04x:SRL HL\n", p_cpu->pc);
     uint8_t value;
     (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
@@ -446,7 +445,7 @@ static int opcode16_SRL_HL(cpu_t *p_cpu)
 //Test bit n in register d.
 static int opcode16_BIT_N_D(cpu_t *p_cpu)
 {
-    DEBUG_PRINT("%04x:BIT N D\n", p_cpu->pc);
+    //DEBUG_PRINT("%04x:BIT N D\n", p_cpu->pc);
     uint8_t opcode;
     (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &opcode);
 
@@ -467,7 +466,7 @@ static int opcode16_BIT_N_D(cpu_t *p_cpu)
 //Test bit n in register d.
 static int opcode16_BIT_N_HL(cpu_t *p_cpu)
 {
-    DEBUG_PRINT("%04x:BIT N HL\n", p_cpu->pc);
+    //DEBUG_PRINT("%04x:BIT N HL\n", p_cpu->pc);
     uint8_t opcode;
     (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &opcode);
 
@@ -488,7 +487,7 @@ static int opcode16_BIT_N_HL(cpu_t *p_cpu)
 //Reset bit n in register d.
 static int opcode16_RES_N_D(cpu_t *p_cpu)
 {
-    DEBUG_PRINT("%04x:RES N D\n", p_cpu->pc);
+    //DEBUG_PRINT("%04x:RES N D\n", p_cpu->pc);
     uint8_t opcode;
     (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &opcode);
 
@@ -509,7 +508,7 @@ static int opcode16_RES_N_D(cpu_t *p_cpu)
 //Reset bit n in register d.
 static int opcode16_RES_N_HL(cpu_t *p_cpu)
 {
-    DEBUG_PRINT("%04x:RES N HL\n", p_cpu->pc);
+    //DEBUG_PRINT("%04x:RES N HL\n", p_cpu->pc);
     uint8_t opcode;
     (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &opcode);
 
@@ -530,7 +529,7 @@ static int opcode16_RES_N_HL(cpu_t *p_cpu)
 //Set bit n in register d.
 static int opcode16_SET_N_D(cpu_t *p_cpu)
 {
-    DEBUG_PRINT("%04x:SET N D\n", p_cpu->pc);
+    //DEBUG_PRINT("%04x:SET N D\n", p_cpu->pc);
     uint8_t opcode;
     (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &opcode);
 
@@ -551,7 +550,7 @@ static int opcode16_SET_N_D(cpu_t *p_cpu)
 //Set bit n in register d.
 static int opcode16_SET_N_HL(cpu_t *p_cpu)
 {
-    DEBUG_PRINT("%04x:SET N HL\n", p_cpu->pc);
+    //DEBUG_PRINT("%04x:SET N HL\n", p_cpu->pc);
     uint8_t opcode;
     (void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &opcode);
 

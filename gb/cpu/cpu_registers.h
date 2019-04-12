@@ -1,7 +1,8 @@
 #ifndef CPU_REGISTERS_H_
 #define CPU_REGISTERS_H_
 
-#include "cpu_base.h"
+#include "cpu_def.h"
+#include "cpu_utils.h"
 
 #include <assert.h>
 

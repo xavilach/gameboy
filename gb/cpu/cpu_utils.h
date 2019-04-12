@@ -1,32 +1,7 @@
-#ifndef CPU_BASE_H_
-#define CPU_BASE_H_
-
-#include "mmu.h"
+#ifndef CPU_UTILS_H_
+#define CPU_UTILS_H_
 
 #include <stdint.h>
-#include <stdlib.h>
-
-/* Typedefs */
-
-typedef struct cpu_s
-{
-	uint16_t reg_AF;
-	uint16_t reg_BC;
-	uint16_t reg_DE;
-	uint16_t reg_HL;
-
-	uint16_t sp;
-	uint16_t pc;
-
-	mmu_t *p_mmu;
-
-	uint8_t irq_master_enable;
-
-	int di_counter;
-	int ei_counter;
-} cpu_t;
-
-/* Inlined function definitions */
 
 static inline void set_msb(uint16_t *p_word, uint8_t value)
 {
@@ -50,4 +25,4 @@ static inline uint8_t get_lsb(uint16_t word)
 	return (uint8_t)word;
 }
 
-#endif /*CPU_BASE_H_*/
+#endif /*CPU_UTILS_H_*/

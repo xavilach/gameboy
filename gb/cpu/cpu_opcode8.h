@@ -1,7 +1,7 @@
 #ifndef CPU_OPCODE8_H_
 #define CPU_OPCODE8_H_
 
-#include "cpu_base.h"
+#include "cpu_def.h"
 
 void opcode8_init(void);
 
