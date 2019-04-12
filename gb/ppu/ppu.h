@@ -1,8 +1,8 @@
 #ifndef PPU_H_
 #define PPU_H_
 
-#include "mmu.h"
-#include "lcd.h"
+#include "../mmu/mmu.h"
+#include "../screen.h"
 
 typedef struct ppu_s ppu_t;
 
@@ -72,10 +72,10 @@ Fetcher
 
 */
 
-ppu_t *ppu_allocate(mmu_t *p_mmu, lcd_t *p_lcd);
+ppu_t *ppu_allocate(mmu_t *p_mmu, screen_t *p_screen);
 
-void ppu_cycle(ppu_t *p_ppu);
+int ppu_execute(ppu_t *p_ppu);
 
-uint8_t ppu_get_pixel(ppu_t *p_ppu, int x, int y);
+void ppu_free(ppu_t *p_ppu);
 
 #endif /*PPU_H_*/

@@ -2,6 +2,8 @@
 #define _CPU_ALU_H_
 
 #include "cpu_registers.h"
+#include "cpu_def.h"
+#include "cpu_utils.h"
 
 static inline void alu_ADD(cpu_t *p_cpu, uint8_t operand)
 {

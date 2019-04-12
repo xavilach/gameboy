@@ -1,7 +1,7 @@
 #ifndef CPU_OPCODE_H_
 #define CPU_OPCODE_H_
 
-#include "cpu_base.h"
+#include "cpu_def.h"
 
 typedef int (*opcode_handler_t)(cpu_t *p_cpu);
 

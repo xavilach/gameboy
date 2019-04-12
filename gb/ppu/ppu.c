@@ -1,14 +1,13 @@
 #include "ppu.h"
 
 #include "ppu_base.h"
-#include "log.h"
 
 #include <stdint.h>
 #include <stdlib.h>
 
-ppu_t *ppu_allocate(mmu_t *p_mmu, lcd_t *p_lcd)
+ppu_t *ppu_allocate(mmu_t *p_mmu, screen_t *p_screen)
 {
-    if (!p_mmu || !p_lcd)
+    if (!p_mmu || !p_screen)
         return NULL;
 
     ppu_t *p_ppu = calloc(1, sizeof(ppu_t));
@@ -16,20 +15,25 @@ ppu_t *ppu_allocate(mmu_t *p_mmu, lcd_t *p_lcd)
     if (p_ppu)
     {
         p_ppu->mmu = p_mmu;
-        p_ppu->lcd = p_lcd;
+        p_ppu->screen = p_screen;
     }
 
     return p_ppu;
 }
 
-void ppu_cycle(ppu_t *p_ppu)
+int ppu_execute(ppu_t *p_ppu)
 {
+    if (!p_ppu)
+    {
+        return 0;
+    }
+
     p_ppu->status.cycles += 1;
 
     set_enabled(p_ppu);
 
     if (!p_ppu->status.enabled)
-        return;
+        return 1;
 
     switch (p_ppu->status.mode)
     {
@@ -81,12 +85,9 @@ void ppu_cycle(ppu_t *p_ppu)
                     int index = p_ppu->status.line_y * 160;
                     index += p_ppu->status.pixel_index;
 
-                    p_ppu->lcd->last_x = p_ppu->status.pixel_index;
-                    p_ppu->lcd->last_y = p_ppu->status.line_y;
-
                     if (index < (160 * 144))
                     {
-                        p_ppu->lcd->pixels[index] = p_ppu->bg_palette.color[data.data];
+                        p_ppu->screen->buffer[index] = p_ppu->bg_palette.color[data.data];
                     }
                     p_ppu->status.pixel_index++;
                 }
@@ -120,7 +121,7 @@ void ppu_cycle(ppu_t *p_ppu)
                 p_ppu->status.mode = PPU_MODE_OAM_SEARCH;
             }
 
-            DEBUG_PRINT("New line %d\n", p_ppu->status.line_y);
+            //DEBUG_PRINT("New line %d\n", p_ppu->status.line_y);
         }
         break;
     case PPU_MODE_V_BLANK:
@@ -138,23 +139,19 @@ void ppu_cycle(ppu_t *p_ppu)
                 p_ppu->status.mode = PPU_MODE_OAM_SEARCH;
             }
 
-            DEBUG_PRINT("New line %d\n", p_ppu->status.line_y);
+            //DEBUG_PRINT("New line %d\n", p_ppu->status.line_y);
         }
         break;
     }
+
+    return 1;
 }
 
-uint8_t ppu_get_pixel(ppu_t *p_ppu, int x, int y)
+void ppu_free(ppu_t *p_ppu)
 {
-    int index = y * 160 + x;
-
-    if (index < (160 * 144))
+    if (p_ppu)
     {
-        return p_ppu->lcd->pixels[index];
-    }
-    else
-    {
-        return 0;
+        free(p_ppu);
     }
 }
 

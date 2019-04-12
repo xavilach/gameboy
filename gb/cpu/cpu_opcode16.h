@@ -1,7 +1,7 @@
 #ifndef CPU_OPCODE16_H_
 #define CPU_OPCODE16_H_
 
-#include "cpu_base.h"
+#include "cpu_def.h"
 
 void opcode16_init(void);
 
