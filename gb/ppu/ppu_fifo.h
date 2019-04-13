@@ -3,8 +3,16 @@
 
 #include <stdint.h>
 
+typedef enum pixel_type_s
+{
+    PIXEL_TYPE_BACKGROUND,
+    PIXEL_TYPE_WINDOW,
+    PIXEL_TYPE_SPRITE
+} pixel_type_t;
+
 typedef struct pixel_data_s
 {
+    pixel_type_t type;
     uint8_t data;
 } pixel_data_t;
 
@@ -15,6 +23,13 @@ typedef struct ppu_fifo_s
     int write;
     int count;
 } ppu_fifo_t;
+
+static inline void ppu_fifo_clear(ppu_fifo_t *p_fifo)
+{
+    p_fifo->read = 0;
+    p_fifo->write = 0;
+    p_fifo->count = 0;
+}
 
 static inline int ppu_fifo_pop(ppu_fifo_t *p_fifo, pixel_data_t *p_data)
 {

@@ -62,8 +62,16 @@ int main(int argc, char *argv[])
 			}
 		}
 
+		display_render_gb(p_display, p_gb);
+
 		unsigned int delta = SDL_GetTicks() - startTime;
 		unsigned int frameTime = (int)(1000.0 / 60.0);
+
+		char str[40];
+		(void)snprintf(str, 40, "Idle %d", ((frameTime - delta) * 100) / frameTime);
+		display_text(p_display, 0, 0, str);
+
+		display_refresh(p_display);
 
 		if (delta < frameTime)
 		{

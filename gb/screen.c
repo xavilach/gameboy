@@ -10,7 +10,7 @@ screen_t *screen_allocate(void)
     {
         p_screen->width = 160;
         p_screen->height = 144;
-        p_screen->buffer = malloc(p_screen->width * p_screen->height);
+        p_screen->buffer = malloc(p_screen->width * p_screen->height * 3);
 
         if (!p_screen->buffer)
         {

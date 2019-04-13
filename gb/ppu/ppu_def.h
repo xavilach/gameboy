@@ -1,11 +1,51 @@
 #ifndef PPU_DEF_H
 #define PPU_DEF_H
 
-#include "ppu_fetcher.h"
 #include "ppu_fifo.h"
 #include "mmu.h"
+#include "screen.h"
 
 #include <stdint.h>
+
+typedef enum ppu_fetcher_state_e
+{
+    FETCHER_STOPPED,
+    FETCHER_GET_TILE,
+    FETCHER_GET_DATA_0,
+    FETCHER_GET_DATA_1,
+    FETCHER_WAIT
+} ppu_fetcher_state_t;
+
+typedef enum ppu_fetcher_mode_e
+{
+    FETCHER_MODE_BACKGROUND,
+    FETCHER_MODE_WINDOW,
+    FETCHER_MODE_SPRITE
+} ppu_fetcher_mode_t;
+
+typedef struct tile_data_s
+{
+    uint8_t index;
+    uint8_t data[2];
+} tile_data_t;
+
+typedef struct ppu_fetcher_s
+{
+    int cycles;
+
+    ppu_fetcher_state_t state;
+    ppu_fetcher_mode_t mode;
+
+    tile_data_t tile;
+
+    uint8_t background_x;
+    uint8_t background_y;
+
+    uint8_t window_x;
+    uint8_t window_y;
+
+    int oam_index;
+} ppu_fetcher_t;
 
 typedef enum ppu_mode_e
 {
@@ -41,11 +81,17 @@ typedef struct window_s
     uint16_t map_address;
 } window_t;
 
+typedef struct tile_s
+{
+    uint8_t data[16];
+} tile_t;
+
 typedef struct oam_entry_s
 {
     uint8_t x;
     uint8_t y;
-    uint8_t tile;
+    uint8_t tile_index;
+    tile_t tile;
     struct
     {
         int priority;
@@ -60,6 +106,7 @@ typedef struct sprites_s
     int enabled;
     oam_entry_t entries[40];
     uint16_t tiles_address;
+    int visibles[10];
 } sprites_t;
 
 typedef struct ppu_s

@@ -17,4 +17,8 @@ int gb_execute(gb_t *p_gb, double duration_ms);
 
 void gb_free(gb_t *p_gb);
 
+/***********************/
+
+void gb_dbg_read_mem(gb_t *p_gb, int address, int size, char *buffer);
+
 #endif /*GB_H_*/
