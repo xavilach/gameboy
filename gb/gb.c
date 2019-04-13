@@ -52,12 +52,7 @@ int gb_load_program(gb_t *p_gb, char *boot, char *rom)
         return -1;
     }
 
-    if (0 != mmu_load_boot(p_gb->mmu, boot))
-    {
-        return -1;
-    }
-
-    if (0 != mmu_load_rom(p_gb->mmu, rom))
+    if (mmu_load(p_gb->mmu, rom, boot) < 0)
     {
         return -1;
     }
@@ -85,6 +80,7 @@ int gb_execute(gb_t *p_gb, double duration_ms)
     int cycles = (int)(duration_ms * ((4.0 * 1024.0 * 1024.0) / 1000.0));
     int cpu_cycles = 0;
     int ppu_cycles = 0;
+    int mmu_cycles = 0;
 
     while (cycles > 0)
     {
@@ -96,6 +92,11 @@ int gb_execute(gb_t *p_gb, double duration_ms)
         if (!ppu_cycles)
         {
             ppu_cycles = ppu_execute(p_gb->ppu);
+        }
+
+        if (!mmu_cycles)
+        {
+            mmu_cycles = mmu_execute(p_gb->mmu);
         }
 
         int wait_cycles = min(cpu_cycles, ppu_cycles);
@@ -130,5 +131,15 @@ void gb_free(gb_t *p_gb)
         p_gb->screen = NULL;
 
         free(p_gb);
+    }
+}
+
+/* DEBUG */
+
+void gb_dbg_read_mem(gb_t *p_gb, int address, int size, char *buffer)
+{
+    for (int i = 0; i < size; i++)
+    {
+        (void)mmu_read_u8(p_gb->mmu, address + i, buffer + i);
     }
 }

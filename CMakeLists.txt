@@ -31,7 +31,7 @@ set(HEADERS ${HEADERS} gb/cpu/cpu.h gb/cpu/cpu_alu.h gb/cpu/cpu_def.h gb/cpu/cpu
 set(HEADERS ${HEADERS} gb/cpu/cpu_opcode.h gb/cpu/cpu_opcode8 gb/cpu/cpu_opcode16 gb/cpu/cpu_registers.h gb/cpu/cpu_utils.h gb/cpu/timer.h)
 set(HEADERS ${HEADERS} gb/joypad/joypad.h)
 set(HEADERS ${HEADERS} gb/mmu/mmu.h gb/mmu/rom.h)
-set(HEADERS ${HEADERS} gb/ppu/ppu.h gb/ppu/ppu_base.h gb/ppu/ppu_def.h gb/ppu/ppu_fetcher.h gb/ppu/ppu_fifo.h)
+set(HEADERS ${HEADERS} gb/ppu/ppu.h gb/ppu/ppu_regs.h gb/ppu/ppu_def.h gb/ppu/ppu_fetcher.h gb/ppu/ppu_fifo.h)
 set(HEADERS ${HEADERS} gb/serial/serial.h)
 set(HEADERS ${HEADERS} gui/display.h)
 
