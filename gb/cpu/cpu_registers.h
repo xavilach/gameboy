@@ -146,8 +146,48 @@ static inline void jump(cpu_t *p_cpu, uint16_t addr)
 
 /* Register accessors */
 
-static inline void
-set_reg3(cpu_t *p_cpu, reg3_t d, uint8_t value)
+static const char str_B[] = "B";
+static const char str_C[] = "C";
+static const char str_D[] = "D";
+static const char str_E[] = "E";
+static const char str_H[] = "H";
+static const char str_L[] = "L";
+static const char str_A[] = "A";
+static const char str_BC[] = "BC";
+static const char str_DE[] = "DE";
+static const char str_HL[] = "HL";
+static const char str_SP[] = "SP";
+static const char str_PC[] = "PC";
+
+static const char str_Z[] = "Z";
+static const char str_NZ[] = "NZ";
+static const char str_NC[] = "CC";
+
+static inline const char *str_reg3(reg3_t d)
+{
+    switch (d)
+    {
+    case REG3_B:
+        return str_B;
+    case REG3_C:
+        return str_C;
+    case REG3_D:
+        return str_D;
+    case REG3_E:
+        return str_E;
+    case REG3_H:
+        return str_H;
+    case REG3_L:
+        return str_L;
+    case REG3_A:
+        return str_A;
+    default:
+        assert(0);
+        return 0;
+    }
+}
+
+static inline void set_reg3(cpu_t *p_cpu, reg3_t d, uint8_t value)
 {
     switch (d)
     {
@@ -202,6 +242,24 @@ static inline uint8_t get_reg3(cpu_t *p_cpu, reg3_t d)
     }
 }
 
+static inline const char *str_reg2(reg2_t r)
+{
+    switch (r)
+    {
+    case REG2_BC:
+        return str_BC;
+    case REG2_DE:
+        return str_DE;
+    case REG2_HL:
+        return str_HL;
+    case REG2_SP:
+        return str_SP;
+    default:
+        assert(0);
+        break;
+    }
+}
+
 static inline void set_reg2(cpu_t *p_cpu, reg2_t r, uint16_t value)
 {
     switch (r)
@@ -242,6 +300,24 @@ static inline uint16_t get_reg2(cpu_t *p_cpu, reg2_t r)
     }
 }
 
+static inline const char *str_reg1(reg3_t r)
+{
+    switch (r)
+    {
+    case REG1_BC:
+        return str_BC;
+    case REG1_DE:
+        return str_DE;
+    case REG1_HL:
+        return str_HL;
+    case REG1_PC:
+        return str_PC;
+    default:
+        assert(0);
+        return 0;
+    }
+}
+
 static inline void set_reg1(cpu_t *p_cpu, reg1_t r, uint16_t value)
 {
     switch (r)
@@ -276,6 +352,24 @@ static inline uint16_t get_reg1(cpu_t *p_cpu, reg1_t r)
         return p_cpu->reg_HL;
     case REG1_PC:
         return p_cpu->pc;
+    default:
+        assert(0);
+        return 0;
+    }
+}
+
+static inline const char *str_mnemonic(reg3_t m)
+{
+    switch (m)
+    {
+    case MNEMONIC_NZ:
+        return str_NZ;
+    case MNEMONIC_Z:
+        return str_Z;
+    case MNEMONIC_NC:
+        return str_NC;
+    case MNEMONIC_C:
+        return str_C;
     default:
         assert(0);
         return 0;
