@@ -1,10 +1,15 @@
 #include "mmu.h"
 
+#include "cartridge.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
 #define BOOT_ENABLE_REG (0xFF50)
+
+#define RAM_OFFSET (0x8000)
+#define RAM_SIZE (0x8000)
 
 #define MEM_SIZE (0x10000)
 
@@ -40,7 +45,8 @@ typedef struct region_s
 typedef struct mmu_s
 {
     uint8_t *boot;
-    uint8_t *mem;
+    uint8_t *ram;
+    cartridge_t *cartridge;
     region_t *regions;
 
     struct
@@ -76,6 +82,8 @@ static region_t *mmu_find_writeable_region(mmu_t *p_mmu, uint16_t address);
 static int mmu_read_boot(mmu_t *p_mmu, uint16_t address, uint8_t *data);
 static int mmu_read_rom(mmu_t *p_mmu, uint16_t address, uint8_t *data);
 static int mmu_write_rom(mmu_t *p_mmu, uint16_t address, uint8_t data);
+static int mmu_read_ext_ram(mmu_t *p_mmu, uint16_t address, uint8_t *data);
+static int mmu_write_ext_ram(mmu_t *p_mmu, uint16_t address, uint8_t data);
 static int mmu_read_ram(mmu_t *p_mmu, uint16_t address, uint8_t *data);
 static int mmu_write_ram(mmu_t *p_mmu, uint16_t address, uint8_t data);
 static int mmu_read_echo_ram(mmu_t *p_mmu, uint16_t address, uint8_t *data);
@@ -104,9 +112,9 @@ mmu_t *mmu_allocate(void)
 
         p_mmu->boot = calloc(BOOT_SIZE, sizeof(uint8_t));
 
-        p_mmu->mem = calloc(MEM_SIZE, sizeof(uint8_t));
+        p_mmu->ram = calloc(RAM_SIZE, sizeof(uint8_t));
 
-        if (!p_mmu->regions || !p_mmu->boot || !p_mmu->mem)
+        if (!p_mmu->regions || !p_mmu->boot || !p_mmu->ram)
         {
             mmu_free(p_mmu);
             p_mmu = NULL;
@@ -130,22 +138,32 @@ int mmu_load(mmu_t *p_mmu, char *rom_path, char *boot_path)
         p_mmu->regions[r].write = NULL;
     }
 
-    int loaded_rom = load_file(rom_path, p_mmu->mem, ROM_SIZE);
+    p_mmu->cartridge = cartridge_allocate(rom_path);
+
     int loaded_boot = load_file(boot_path, p_mmu->boot, BOOT_SIZE);
 
-    if ((loaded_rom < 0) && (loaded_boot < 0))
+    if ((!p_mmu->cartridge) && (loaded_boot < 0))
     {
         /* Nothing could be loaded. */
         return -1;
     }
 
-    if (0 == loaded_rom)
+    if (p_mmu->cartridge)
     {
         printf("MMU loaded ROM from %s\n", rom_path);
         p_mmu->regions[REGION_ROM].read = mmu_read_rom;
         p_mmu->regions[REGION_ROM].write = mmu_write_rom;
-        p_mmu->regions[REGION_EXT_VRAM].read = mmu_read_ram;
-        p_mmu->regions[REGION_EXT_VRAM].write = mmu_write_ram;
+
+        p_mmu->regions[REGION_EXT_VRAM].read = mmu_read_ext_ram;
+        p_mmu->regions[REGION_EXT_VRAM].write = mmu_write_ext_ram;
+
+        /*
+        printf("ROM header:\n");
+        printf("Title:\t%s\n", p_mmu->cartridge->header.title);
+        printf("Type:\t%02x\n", p_mmu->cartridge->header.type);
+        printf("ROM size:\t%d\n", p_mmu->cartridge->header.rom_size);
+        printf("RAM size:\t%d\n", p_mmu->cartridge->header.ram_size);
+        */
     }
 
     if (0 == loaded_boot)
@@ -162,12 +180,14 @@ int mmu_load(mmu_t *p_mmu, char *rom_path, char *boot_path)
     p_mmu->regions[REGION_ECHO_RAM].write = mmu_write_echo_ram;
     p_mmu->regions[REGION_OAM_RAM].read = mmu_read_ram;
     p_mmu->regions[REGION_OAM_RAM].write = mmu_write_ram;
-    p_mmu->regions[REGION_UNUSED].read = mmu_read_unused;
-    p_mmu->regions[REGION_UNUSED].write = mmu_write_unused;
-    p_mmu->regions[REGION_IO].read = mmu_read_io;
-    p_mmu->regions[REGION_IO].write = mmu_write_io;
     p_mmu->regions[REGION_HRAM].read = mmu_read_ram;
     p_mmu->regions[REGION_HRAM].write = mmu_write_ram;
+
+    p_mmu->regions[REGION_UNUSED].read = mmu_read_unused;
+    p_mmu->regions[REGION_UNUSED].write = mmu_write_unused;
+
+    p_mmu->regions[REGION_IO].read = mmu_read_io;
+    p_mmu->regions[REGION_IO].write = mmu_write_io;
 
     return 0;
 }
@@ -179,13 +199,15 @@ int mmu_execute(mmu_t *p_mmu)
         uint16_t destination = p_mmu->dma.destination + p_mmu->dma.offset;
         uint16_t source = p_mmu->dma.source + p_mmu->dma.offset;
 
-        p_mmu->mem[destination] = p_mmu->mem[source];
+        uint8_t value;
+        (void)mmu_read_u8(p_mmu, source, &value);
+        (void)mmu_write_u8(p_mmu, destination, value);
 
         p_mmu->dma.offset += 1;
         if (p_mmu->dma.offset >= 160)
         {
             p_mmu->dma.enabled = 0;
-            printf("MMU: Finished DMA transfer from 0x%04x to 0x%04x\n", p_mmu->dma.source + p_mmu->dma.offset - 1, p_mmu->dma.destination + p_mmu->dma.offset - 1);
+            //printf("MMU: Finished DMA transfer from 0x%04x to 0x%04x\n", p_mmu->dma.source + p_mmu->dma.offset - 1, p_mmu->dma.destination + p_mmu->dma.offset - 1);
         }
     }
     return 1;
@@ -199,7 +221,12 @@ int mmu_read_u8(mmu_t *p_mmu, uint16_t address, uint8_t *data)
     region_t *p_region = mmu_find_readable_region(p_mmu, address);
     if (p_region)
     {
-        return p_region->read(p_mmu, address, data);
+        int ret = p_region->read(p_mmu, address, data);
+        if (ret < 0)
+        {
+            printf("MMU: Read access failure: 0x%04x\n", address);
+        }
+        return ret;
     }
 
     printf("MMU: Read access violation: 0x%04x\n", address);
@@ -216,7 +243,12 @@ int mmu_write_u8(mmu_t *p_mmu, uint16_t address, uint8_t data)
     region_t *p_region = mmu_find_writeable_region(p_mmu, address);
     if (p_region)
     {
-        return p_region->write(p_mmu, address, data);
+        int ret = p_region->write(p_mmu, address, data);
+        if (ret < 0)
+        {
+            printf("MMU: Write access failure: 0x%04x\n", address);
+        }
+        return ret;
     }
 
     printf("MMU: Write access violation: 0x%04x\n", address);
@@ -282,10 +314,16 @@ void mmu_free(mmu_t *p_mmu)
             p_mmu->boot = NULL;
         }
 
-        if (p_mmu->mem)
+        if (p_mmu->ram)
         {
-            free(p_mmu->mem);
-            p_mmu->mem = NULL;
+            free(p_mmu->ram);
+            p_mmu->ram = NULL;
+        }
+
+        if (p_mmu->cartridge)
+        {
+            cartridge_free(p_mmu->cartridge);
+            p_mmu->cartridge = NULL;
         }
     }
 }
@@ -356,37 +394,45 @@ static int mmu_read_boot(mmu_t *p_mmu, uint16_t address, uint8_t *data)
 
 static int mmu_read_rom(mmu_t *p_mmu, uint16_t address, uint8_t *data)
 {
-    *data = p_mmu->mem[address];
-    return 0;
+    return cartridge_read_rom(p_mmu->cartridge, address, data);
 }
 
 static int mmu_write_rom(mmu_t *p_mmu, uint16_t address, uint8_t data)
 {
-    /* Ignore for now. */
-    return 0;
+    return cartridge_write_rom(p_mmu->cartridge, address, data);
+}
+
+static int mmu_read_ext_ram(mmu_t *p_mmu, uint16_t address, uint8_t *data)
+{
+    return cartridge_read_ram(p_mmu->cartridge, address, data);
+}
+
+static int mmu_write_ext_ram(mmu_t *p_mmu, uint16_t address, uint8_t data)
+{
+    return cartridge_write_ram(p_mmu->cartridge, address, data);
 }
 
 static int mmu_read_ram(mmu_t *p_mmu, uint16_t address, uint8_t *data)
 {
-    *data = p_mmu->mem[address];
+    *data = p_mmu->ram[address - RAM_OFFSET];
     return 0;
 }
 
 static int mmu_write_ram(mmu_t *p_mmu, uint16_t address, uint8_t data)
 {
-    p_mmu->mem[address] = data;
+    p_mmu->ram[address - RAM_OFFSET] = data;
     return 0;
 }
 
 static int mmu_read_echo_ram(mmu_t *p_mmu, uint16_t address, uint8_t *data)
 {
-    *data = p_mmu->mem[address - 0x2000];
+    *data = p_mmu->ram[(address - 0x2000) - RAM_OFFSET];
     return 0;
 }
 
 static int mmu_write_echo_ram(mmu_t *p_mmu, uint16_t address, uint8_t data)
 {
-    p_mmu->mem[address - 0x2000] = data;
+    p_mmu->ram[(address - 0x2000) - RAM_OFFSET] = data;
     return 0;
 }
 
@@ -404,7 +450,7 @@ static int mmu_write_unused(mmu_t *p_mmu, uint16_t address, uint8_t data)
 
 static int mmu_read_io(mmu_t *p_mmu, uint16_t address, uint8_t *data)
 {
-    *data = p_mmu->mem[address];
+    *data = p_mmu->ram[address - RAM_OFFSET];
     return 0;
 }
 
@@ -437,7 +483,7 @@ static int mmu_write_io(mmu_t *p_mmu, uint16_t address, uint8_t data)
         break;
     }
 
-    p_mmu->mem[address] = data;
+    p_mmu->ram[address - RAM_OFFSET] = data;
     return 0;
 }
 
