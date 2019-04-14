@@ -15,6 +15,7 @@ typedef struct display_s
 } display_t;
 
 static void get_text_and_rect(SDL_Renderer *renderer, int x, int y, char *text, TTF_Font *font, SDL_Texture **texture, SDL_Rect *rect);
+static void display_dbg_address(display_t *p_display, gb_t *p_gb, uint16_t address, int size, int line, int column);
 
 int display_init(void)
 {
@@ -90,15 +91,55 @@ int display_render_gb(display_t *p_display, gb_t *p_gb)
         }
     }
 
-    char buffer[20];
-    gb_dbg_read_mem(p_gb, 0xFF40, 20, buffer);
+    return 0;
+}
 
-    for (int i = 0; i < 20; i++)
+int display_dbg_registers(display_t *p_display, gb_t *p_gb, dbg_registers_t regs)
+{
+    if (!p_display || regs >= DBG_REGISTERS_MAX)
     {
-        char str[40];
-        snprintf(str, 40, "0x%04x:0x%02x", (uint16_t)(0xFF40 + i), (uint8_t)buffer[i]);
+        return -1;
+    }
 
-        display_text(p_display, 0, 40 + 20 * i, str);
+    switch (regs)
+    {
+    case DBG_REGISTERS_APU:
+        display_text(p_display, 0, 40, "APU");
+        display_dbg_address(p_display, p_gb, 0xFF10, 14, 4, 0);
+        display_dbg_address(p_display, p_gb, 0xFF20, 7, 4 + 14, 0);
+        break;
+
+    case DBG_REGISTERS_INTC:
+        display_text(p_display, 0, 40, "INTC");
+        display_dbg_address(p_display, p_gb, 0xFF0F, 1, 4, 0);
+        display_dbg_address(p_display, p_gb, 0xFFFF, 1, 4 + 1, 0);
+        break;
+
+    case DBG_REGISTERS_JOYPAD:
+        display_text(p_display, 0, 40, "Joypad");
+        display_dbg_address(p_display, p_gb, 0xFF00, 1, 4, 0);
+        break;
+
+    case DBG_REGISTERS_PPU:
+        display_text(p_display, 0, 40, "PPU");
+        display_dbg_address(p_display, p_gb, 0xFF40, 12, 4, 0);
+        break;
+
+    case DBG_REGISTERS_SERIAL:
+        display_text(p_display, 0, 40, "Serial");
+        display_dbg_address(p_display, p_gb, 0xFF01, 2, 4, 0);
+        break;
+
+    case DBG_REGISTERS_TIMER:
+        display_text(p_display, 0, 40, "Timer");
+        display_dbg_address(p_display, p_gb, 0xFF04, 4, 4, 0);
+        break;
+
+    case DBG_REGISTERS_NONE:
+        break;
+
+    default:
+        return -1;
     }
 
     return 0;
@@ -186,6 +227,21 @@ static void get_text_and_rect(SDL_Renderer *renderer, int x, int y, char *text, 
     rect->y = y;
     rect->w = text_width;
     rect->h = text_height;
+}
+
+static void display_dbg_address(display_t *p_display, gb_t *p_gb, uint16_t address, int size, int line, int column)
+{
+    char buffer[50];
+    char str[40];
+
+    gb_dbg_read_mem(p_gb, address, size, buffer);
+
+    for (int i = 0; i < size; i++)
+    {
+        snprintf(str, 40, "0x%04x:0x%02x", (uint16_t)(address + i), (uint8_t)buffer[i]);
+
+        display_text(p_display, column * 120, 20 * (line + i), str);
+    }
 }
 
 /*
