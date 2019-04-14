@@ -88,10 +88,13 @@ static inline void fetch_background(ppu_t *p_ppu)
             for (int p = 0; p < 8; p++)
             {
                 data.type = PIXEL_TYPE_BACKGROUND;
-                data.data = (p_ppu->fetcher.tile.data[0] >> (7 - p)) & 0x01;
-                data.data <<= 1;
-                data.data |= (p_ppu->fetcher.tile.data[1] >> (7 - p)) & 0x01;
-
+                data.data = 0;
+                if (p_ppu->background.enabled)
+                {
+                    data.data = (p_ppu->fetcher.tile.data[0] >> (7 - p)) & 0x01;
+                    data.data <<= 1;
+                    data.data |= (p_ppu->fetcher.tile.data[1] >> (7 - p)) & 0x01;
+                }
                 (void)ppu_fifo_push(&(p_ppu->fifo), data);
             }
 
@@ -168,10 +171,13 @@ static inline void fetch_window(ppu_t *p_ppu)
             for (int p = 0; p < 8; p++)
             {
                 data.type = PIXEL_TYPE_WINDOW;
-                data.data = (p_ppu->fetcher.tile.data[0] >> (7 - p)) & 0x01;
-                data.data <<= 1;
-                data.data |= (p_ppu->fetcher.tile.data[1] >> (7 - p)) & 0x01;
-
+                data.data = 0;
+                if (p_ppu->window.enabled)
+                {
+                    data.data = (p_ppu->fetcher.tile.data[0] >> (7 - p)) & 0x01;
+                    data.data <<= 1;
+                    data.data |= (p_ppu->fetcher.tile.data[1] >> (7 - p)) & 0x01;
+                }
                 (void)ppu_fifo_push(&(p_ppu->fifo), data);
             }
 

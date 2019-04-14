@@ -3,6 +3,9 @@
 
 #include "ppu_def.h"
 
+#include <stdio.h>
+#include <stdlib.h>
+
 #define PPU_REG_LCDC (0xFF40)
 #define PPU_REG_STAT (0xFF41)
 #define PPU_REG_SCY (0xFF42)
@@ -42,18 +45,6 @@ static inline void ppu_reg_read_lcdc(ppu_t *p_ppu)
     p_ppu->background.enabled = (0 != ((lcdc >> 0) & 0x01));
 }
 
-static inline void ppu_reg_read_stat(ppu_t *p_ppu)
-{
-    uint8_t stat;
-    (void)mmu_read_u8(p_ppu->mmu, PPU_REG_STAT, &stat);
-
-    //TODO
-    // 6 LYC == LY IRQ
-    // 5 Mode 2 IRQ
-    // 4 Mode 1 IRQ
-    // 3 Mode 0 IRQ
-}
-
 static inline void ppu_reg_read_sc(ppu_t *p_ppu)
 {
     uint8_t scy, scx;
@@ -69,7 +60,7 @@ static inline void ppu_reg_read_lyc(ppu_t *p_ppu)
     uint8_t lyc;
     (void)mmu_read_u8(p_ppu->mmu, PPU_REG_LYC, &lyc);
 
-    //TODO
+    p_ppu->status.line_y_compare = lyc;
 }
 
 static inline void ppu_reg_read_bgp_obp(ppu_t *p_ppu)
@@ -106,11 +97,65 @@ static inline void ppu_reg_write_stat(ppu_t *p_ppu)
     uint8_t stat;
     (void)mmu_read_u8(p_ppu->mmu, PPU_REG_STAT, &stat);
 
-    //TODO
-    // 2 LYC == LY
-    // 1-0 Mode
+    int coincidence_irq = (0 != ((stat >> 6) & 0x01));
+    int oam_irq = (0 != ((stat >> 5) & 0x01));
+    int vblank_irq = (0 != ((stat >> 4) & 0x01));
+    int hblank_irq = (0 != ((stat >> 3) & 0x01));
+
+    int coincidence_flag = (p_ppu->status.line_y == p_ppu->status.line_y_compare);
+
+    stat = (stat & 0xF8);
+
+    /* LYC == LY */
+    if (coincidence_flag)
+    {
+        stat |= 0x04;
+    }
+
+    /* PPU mode */
+    stat |= p_ppu->status.mode & 0x03;
 
     (void)mmu_write_u8(p_ppu->mmu, PPU_REG_STAT, stat);
+
+    //TODO Cleaner way
+    uint8_t irq_flags;
+    (void)mmu_read_u8(p_ppu->mmu, 0xFF0F, &irq_flags);
+
+    int stat_flag = (0 != ((irq_flags >> 1) & 0x01));
+
+    if (!stat_flag && coincidence_irq && coincidence_flag)
+    {
+        stat_flag = 1;
+    }
+
+    if (!stat_flag && oam_irq && (PPU_MODE_OAM_SEARCH == p_ppu->status.mode))
+    {
+        stat_flag = 1;
+    }
+
+    if (!stat_flag && vblank_irq && (PPU_MODE_V_BLANK == p_ppu->status.mode))
+    {
+        stat_flag = 1;
+    }
+
+    if (!stat_flag && hblank_irq && (PPU_MODE_H_BLANK == p_ppu->status.mode))
+    {
+        stat_flag = 1;
+    }
+
+    if (stat_flag)
+    {
+        irq_flags |= 0x02;
+    }
+
+    int vblank_flag = (PPU_MODE_V_BLANK == p_ppu->status.mode);
+
+    if (vblank_flag)
+    {
+        irq_flags |= 0x01;
+    }
+
+    (void)mmu_write_u8(p_ppu->mmu, 0xFF0F, irq_flags);
 }
 
 static inline void ppu_reg_write_LY(ppu_t *p_ppu)

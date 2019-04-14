@@ -49,10 +49,10 @@ typedef struct ppu_fetcher_s
 
 typedef enum ppu_mode_e
 {
-    PPU_MODE_OAM_SEARCH = 2,
-    PPU_MODE_PIXEL_TRANSFER = 3,
     PPU_MODE_H_BLANK = 0,
-    PPU_MODE_V_BLANK = 1
+    PPU_MODE_V_BLANK = 1,
+    PPU_MODE_OAM_SEARCH = 2,
+    PPU_MODE_PIXEL_TRANSFER = 3
 } ppu_mode_t;
 
 typedef struct palette_s
@@ -117,6 +117,7 @@ typedef struct ppu_s
         ppu_mode_t mode;
         int cycles;
         uint8_t line_y;
+        uint8_t line_y_compare;
         int pixel_index;
     } status;
 
