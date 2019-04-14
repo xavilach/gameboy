@@ -46,7 +46,6 @@ int ppu_execute(ppu_t *p_ppu)
 
         if (p_ppu->status.cycles >= 20 * 40)
         {
-            ppu_reg_read_stat(p_ppu);
             ppu_reg_read_sc(p_ppu);
             ppu_reg_read_lyc(p_ppu);
             ppu_reg_read_bgp_obp(p_ppu);
@@ -55,8 +54,10 @@ int ppu_execute(ppu_t *p_ppu)
             ppu_load_oam_entries(p_ppu);
 
             p_ppu->status.cycles = 0;
-            p_ppu->status.mode = PPU_MODE_PIXEL_TRANSFER;
             p_ppu->status.pixel_index = 0;
+
+            p_ppu->status.mode = PPU_MODE_PIXEL_TRANSFER;
+            ppu_reg_write_stat(p_ppu);
 
             fetch_reset(p_ppu);
         }
@@ -74,6 +75,7 @@ int ppu_execute(ppu_t *p_ppu)
             //Finished LCD line
             //Trigger HBLANK IRQ (STAT).
             p_ppu->status.mode = PPU_MODE_H_BLANK;
+            ppu_reg_write_stat(p_ppu);
         }
         break;
     case PPU_MODE_H_BLANK:
@@ -89,11 +91,13 @@ int ppu_execute(ppu_t *p_ppu)
                 // Trigger VBLANK IRQ.
                 //Trigger VBLANK IRQ (STAT).
                 p_ppu->status.mode = PPU_MODE_V_BLANK;
+                ppu_reg_write_stat(p_ppu);
             }
             else
             {
                 //Trigger OAM IRQ (STAT).
                 p_ppu->status.mode = PPU_MODE_OAM_SEARCH;
+                ppu_reg_write_stat(p_ppu);
             }
 
             //DEBUG_PRINT("New line %d\n", p_ppu->status.line_y);
@@ -112,6 +116,7 @@ int ppu_execute(ppu_t *p_ppu)
                 p_ppu->status.line_y = 0;
                 //Trigger OAM IRQ (STAT).
                 p_ppu->status.mode = PPU_MODE_OAM_SEARCH;
+                ppu_reg_write_stat(p_ppu);
             }
 
             //DEBUG_PRINT("New line %d\n", p_ppu->status.line_y);
