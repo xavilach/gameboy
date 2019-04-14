@@ -44,6 +44,8 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
+	dbg_registers_t regs = 0;
+
 	int quit = 0;
 	while (!quit)
 	{
@@ -59,10 +61,35 @@ int main(int argc, char *argv[])
 			case SDL_QUIT:
 				quit = 1;
 				break;
+
+			case SDL_KEYDOWN:
+				switch (event.key.keysym.scancode)
+				{
+				case SDL_SCANCODE_ESCAPE:
+					quit = 1;
+					break;
+
+				case SDL_SCANCODE_N:
+					regs = (regs + 1) % DBG_REGISTERS_MAX;
+					break;
+
+				case SDL_SCANCODE_P:
+					regs = (regs - 1) % DBG_REGISTERS_MAX;
+					break;
+
+				default:
+					break;
+				}
+				break;
+
+			default:
+				break;
 			}
 		}
 
 		display_render_gb(p_display, p_gb);
+
+		display_dbg_registers(p_display, p_gb, regs);
 
 		unsigned int delta = SDL_GetTicks() - startTime;
 		unsigned int frameTime = (int)(1000.0 / 60.0);
