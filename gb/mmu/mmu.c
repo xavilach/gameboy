@@ -26,12 +26,15 @@ enum region_e
     REGION_MAX
 };
 
+typedef int (*mmu_read_access_t)(mmu_t *p_mmu, uint16_t address, uint8_t *data);
+typedef int (*mmu_write_access_t)(mmu_t *p_mmu, uint16_t address, uint8_t data);
+
 typedef struct region_s
 {
     uint16_t start;
     uint16_t end;
-    int read;
-    int write;
+    mmu_read_access_t read;
+    mmu_write_access_t write;
 } region_t;
 
 typedef struct mmu_s
@@ -63,7 +66,28 @@ static const region_t regions_init[REGION_MAX] = {
     {0xFF80, 0xFFFF, 0, 0}, // HRAM
 };
 
+/*******************************************/
+
 static int load_file(char *path, void *mem, uint16_t size);
+
+static region_t *mmu_find_readable_region(mmu_t *p_mmu, uint16_t address);
+static region_t *mmu_find_writeable_region(mmu_t *p_mmu, uint16_t address);
+
+static int mmu_read_boot(mmu_t *p_mmu, uint16_t address, uint8_t *data);
+static int mmu_read_rom(mmu_t *p_mmu, uint16_t address, uint8_t *data);
+static int mmu_write_rom(mmu_t *p_mmu, uint16_t address, uint8_t data);
+static int mmu_read_ram(mmu_t *p_mmu, uint16_t address, uint8_t *data);
+static int mmu_write_ram(mmu_t *p_mmu, uint16_t address, uint8_t data);
+static int mmu_read_echo_ram(mmu_t *p_mmu, uint16_t address, uint8_t *data);
+static int mmu_write_echo_ram(mmu_t *p_mmu, uint16_t address, uint8_t data);
+static int mmu_read_unused(mmu_t *p_mmu, uint16_t address, uint8_t *data);
+static int mmu_write_unused(mmu_t *p_mmu, uint16_t address, uint8_t data);
+static int mmu_read_io(mmu_t *p_mmu, uint16_t address, uint8_t *data);
+static int mmu_write_io(mmu_t *p_mmu, uint16_t address, uint8_t data);
+
+static void mmu_print_regions(mmu_t *p_mmu);
+
+/*******************************************/
 
 mmu_t *mmu_allocate(void)
 {
@@ -102,8 +126,8 @@ int mmu_load(mmu_t *p_mmu, char *rom_path, char *boot_path)
     for (int r = 0; r < REGION_MAX; r++)
     {
         /* Disallow all accesses. */
-        p_mmu->regions[r].read = 0;
-        p_mmu->regions[r].write = 0;
+        p_mmu->regions[r].read = NULL;
+        p_mmu->regions[r].write = NULL;
     }
 
     int loaded_rom = load_file(rom_path, p_mmu->mem, ROM_SIZE);
@@ -118,31 +142,32 @@ int mmu_load(mmu_t *p_mmu, char *rom_path, char *boot_path)
     if (0 == loaded_rom)
     {
         printf("MMU loaded ROM from %s\n", rom_path);
-        p_mmu->regions[REGION_ROM].read = 1;
-        p_mmu->regions[REGION_EXT_VRAM].read = 1;
-        p_mmu->regions[REGION_EXT_VRAM].write = 1;
+        p_mmu->regions[REGION_ROM].read = mmu_read_rom;
+        p_mmu->regions[REGION_ROM].write = mmu_write_rom;
+        p_mmu->regions[REGION_EXT_VRAM].read = mmu_read_ram;
+        p_mmu->regions[REGION_EXT_VRAM].write = mmu_write_ram;
     }
 
     if (0 == loaded_boot)
     {
         printf("MMU loaded BOOT ROM from %s\n", boot_path);
-        p_mmu->regions[REGION_BOOT].read = 1;
+        p_mmu->regions[REGION_BOOT].read = mmu_read_boot;
     }
 
-    p_mmu->regions[REGION_VRAM].read = 1;
-    p_mmu->regions[REGION_VRAM].write = 1;
-    p_mmu->regions[REGION_RAM].read = 1;
-    p_mmu->regions[REGION_RAM].write = 1;
-    p_mmu->regions[REGION_ECHO_RAM].read = 0;
-    p_mmu->regions[REGION_ECHO_RAM].write = 0;
-    p_mmu->regions[REGION_OAM_RAM].read = 1;
-    p_mmu->regions[REGION_OAM_RAM].write = 1;
-    p_mmu->regions[REGION_UNUSED].read = 1;
-    p_mmu->regions[REGION_UNUSED].write = 1;
-    p_mmu->regions[REGION_IO].read = 1;
-    p_mmu->regions[REGION_IO].write = 1;
-    p_mmu->regions[REGION_HRAM].read = 1;
-    p_mmu->regions[REGION_HRAM].write = 1;
+    p_mmu->regions[REGION_VRAM].read = mmu_read_ram;
+    p_mmu->regions[REGION_VRAM].write = mmu_write_ram;
+    p_mmu->regions[REGION_RAM].read = mmu_read_ram;
+    p_mmu->regions[REGION_RAM].write = mmu_write_ram;
+    p_mmu->regions[REGION_ECHO_RAM].read = mmu_read_echo_ram;
+    p_mmu->regions[REGION_ECHO_RAM].write = mmu_write_echo_ram;
+    p_mmu->regions[REGION_OAM_RAM].read = mmu_read_ram;
+    p_mmu->regions[REGION_OAM_RAM].write = mmu_write_ram;
+    p_mmu->regions[REGION_UNUSED].read = mmu_read_unused;
+    p_mmu->regions[REGION_UNUSED].write = mmu_write_unused;
+    p_mmu->regions[REGION_IO].read = mmu_read_io;
+    p_mmu->regions[REGION_IO].write = mmu_write_io;
+    p_mmu->regions[REGION_HRAM].read = mmu_read_ram;
+    p_mmu->regions[REGION_HRAM].write = mmu_write_ram;
 
     return 0;
 }
@@ -171,40 +196,14 @@ int mmu_read_u8(mmu_t *p_mmu, uint16_t address, uint8_t *data)
     if (!p_mmu || !data)
         return -1;
 
-    for (int r = 0; r < REGION_MAX; r++)
+    region_t *p_region = mmu_find_readable_region(p_mmu, address);
+    if (p_region)
     {
-        region_t *p_region = p_mmu->regions + r;
-        if (p_region->read && (p_region->start <= address) && (address <= p_region->end))
-        {
-            //TODO Nicer way.
-            if (REGION_BOOT == r)
-            {
-                *data = p_mmu->boot[address];
-            }
-            else if (REGION_ECHO_RAM == r)
-            {
-                *data = p_mmu->mem[address - 0x2000];
-            }
-            else if (REGION_UNUSED == r)
-            {
-                *data = 0;
-            }
-            else
-            {
-                *data = p_mmu->mem[address];
-            }
-            return 0;
-        }
+        return p_region->read(p_mmu, address, data);
     }
 
-    *data = 0;
     printf("MMU: Read access violation: 0x%04x\n", address);
-    for (int r = 0; r < REGION_MAX; r++)
-    {
-        region_t *p_region = p_mmu->regions + r;
-
-        printf("MMU: Region %d [0x%04x - 0x%04x] [R%d W%d]\n", r, p_region->start, p_region->end, p_region->read, p_region->write);
-    }
+    mmu_print_regions(p_mmu);
     exit(-1);
     return -1;
 }
@@ -214,57 +213,14 @@ int mmu_write_u8(mmu_t *p_mmu, uint16_t address, uint8_t data)
     if (!p_mmu)
         return -1;
 
-    for (int r = 0; r < REGION_MAX; r++)
+    region_t *p_region = mmu_find_writeable_region(p_mmu, address);
+    if (p_region)
     {
-        region_t *p_region = p_mmu->regions + r;
-        if (p_region->read && (p_region->start <= address) && (address <= p_region->end))
-        {
-            if (REGION_ECHO_RAM == r)
-            {
-                p_mmu->mem[address - 0x2000] = data;
-            }
-            else if (REGION_UNUSED == r)
-            {
-                /* Ignore */
-            }
-            else
-            {
-                p_mmu->mem[address] = data;
-
-                if (0xFF46 == address)
-                {
-                    if (!p_mmu->dma.enabled)
-                    {
-                        p_mmu->dma.enabled = 1;
-                        p_mmu->dma.offset = 0;
-                        p_mmu->dma.source = data;
-                        p_mmu->dma.source <= 8;
-                        p_mmu->dma.destination = 0xFE00;
-
-                        printf("MMU: Starting DMA transfer from 0x%04x to 0x%04x\n", p_mmu->dma.source, p_mmu->dma.destination);
-                    }
-                }
-                else if (0xFF50 == address)
-                {
-                    if (data)
-                    {
-                        /* Disable boot. */
-                        p_mmu->regions[REGION_BOOT].read = 0;
-                    }
-                }
-            }
-
-            return 0;
-        }
+        return p_region->write(p_mmu, address, data);
     }
 
     printf("MMU: Write access violation: 0x%04x\n", address);
-    for (int r = 0; r < REGION_MAX; r++)
-    {
-        region_t *p_region = p_mmu->regions + r;
-
-        printf("MMU: Region %d [0x%04x - 0x%04x] [R%d W%d]\n", r, p_region->start, p_region->end, p_region->read, p_region->write);
-    }
+    mmu_print_regions(p_mmu);
     exit(-1);
     return -1;
 }
@@ -334,6 +290,8 @@ void mmu_free(mmu_t *p_mmu)
     }
 }
 
+/***************************************/
+
 static int load_file(char *path, void *mem, uint16_t size)
 {
     FILE *file = fopen(path, "rb");
@@ -360,4 +318,134 @@ static int load_file(char *path, void *mem, uint16_t size)
 
     fclose(file);
     return 0;
+}
+
+static region_t *mmu_find_readable_region(mmu_t *p_mmu, uint16_t address)
+{
+    for (int r = 0; r < REGION_MAX; r++)
+    {
+        region_t *p_region = p_mmu->regions + r;
+        if (p_region->read && (p_region->start <= address) && (address <= p_region->end))
+        {
+            return p_region;
+        }
+    }
+
+    return NULL;
+}
+
+static region_t *mmu_find_writeable_region(mmu_t *p_mmu, uint16_t address)
+{
+    for (int r = 0; r < REGION_MAX; r++)
+    {
+        region_t *p_region = p_mmu->regions + r;
+        if (p_region->write && (p_region->start <= address) && (address <= p_region->end))
+        {
+            return p_region;
+        }
+    }
+
+    return NULL;
+}
+
+static int mmu_read_boot(mmu_t *p_mmu, uint16_t address, uint8_t *data)
+{
+    *data = p_mmu->boot[address];
+    return 0;
+}
+
+static int mmu_read_rom(mmu_t *p_mmu, uint16_t address, uint8_t *data)
+{
+    *data = p_mmu->mem[address];
+    return 0;
+}
+
+static int mmu_write_rom(mmu_t *p_mmu, uint16_t address, uint8_t data)
+{
+    /* Ignore for now. */
+    return 0;
+}
+
+static int mmu_read_ram(mmu_t *p_mmu, uint16_t address, uint8_t *data)
+{
+    *data = p_mmu->mem[address];
+    return 0;
+}
+
+static int mmu_write_ram(mmu_t *p_mmu, uint16_t address, uint8_t data)
+{
+    p_mmu->mem[address] = data;
+    return 0;
+}
+
+static int mmu_read_echo_ram(mmu_t *p_mmu, uint16_t address, uint8_t *data)
+{
+    *data = p_mmu->mem[address - 0x2000];
+    return 0;
+}
+
+static int mmu_write_echo_ram(mmu_t *p_mmu, uint16_t address, uint8_t data)
+{
+    p_mmu->mem[address - 0x2000] = data;
+    return 0;
+}
+
+static int mmu_read_unused(mmu_t *p_mmu, uint16_t address, uint8_t *data)
+{
+    *data = 0xFF;
+    return 0;
+}
+
+static int mmu_write_unused(mmu_t *p_mmu, uint16_t address, uint8_t data)
+{
+    //Ignore.
+    return 0;
+}
+
+static int mmu_read_io(mmu_t *p_mmu, uint16_t address, uint8_t *data)
+{
+    *data = p_mmu->mem[address];
+    return 0;
+}
+
+static int mmu_write_io(mmu_t *p_mmu, uint16_t address, uint8_t data)
+{
+    switch (address)
+    {
+    case 0xFF46:
+        if (!p_mmu->dma.enabled)
+        {
+            p_mmu->dma.enabled = 1;
+            p_mmu->dma.offset = 0;
+            p_mmu->dma.source = data;
+            p_mmu->dma.source <= 8;
+            p_mmu->dma.destination = 0xFE00;
+
+            printf("MMU: Starting DMA transfer from 0x%04x to 0x%04x\n", p_mmu->dma.source, p_mmu->dma.destination);
+            //exit(-1);
+        }
+        break;
+
+    case 0xFF50:
+        if (data)
+        {
+            p_mmu->regions[REGION_BOOT].read = NULL;
+        }
+        break;
+
+    default:
+        break;
+    }
+
+    p_mmu->mem[address] = data;
+    return 0;
+}
+
+static void mmu_print_regions(mmu_t *p_mmu)
+{
+    for (int r = 0; r < REGION_MAX; r++)
+    {
+        region_t *p_region = p_mmu->regions + r;
+        printf("MMU: Region %d [0x%04x - 0x%04x] [R%d W%d]\n", r, p_region->start, p_region->end, p_region->read != 0, p_region->write != 0);
+    }
 }
