@@ -1134,9 +1134,10 @@ static int opcode8_RST_N(cpu_t *p_cpu)
 	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &n);
 	n &= 0x38;
 
-	push_pc(p_cpu);
-
 	DEBUG_PRINT("%04x:RST %04x\n", p_cpu->pc, (uint16_t)n);
+
+	p_cpu->pc += 1;
+	push_pc(p_cpu);
 	jump(p_cpu, n);
 	return 32;
 }
