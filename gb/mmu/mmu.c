@@ -157,13 +157,11 @@ int mmu_load(mmu_t *p_mmu, char *rom_path, char *boot_path)
         p_mmu->regions[REGION_EXT_VRAM].read = mmu_read_ext_ram;
         p_mmu->regions[REGION_EXT_VRAM].write = mmu_write_ext_ram;
 
-        /*
         printf("ROM header:\n");
         printf("Title:\t%s\n", p_mmu->cartridge->header.title);
         printf("Type:\t%02x\n", p_mmu->cartridge->header.type);
         printf("ROM size:\t%d\n", p_mmu->cartridge->header.rom_size);
         printf("RAM size:\t%d\n", p_mmu->cartridge->header.ram_size);
-        */
     }
 
     if (0 == loaded_boot)
@@ -262,21 +260,20 @@ int mmu_read_u16(mmu_t *p_mmu, uint16_t address, uint16_t *data)
     if (!p_mmu || !data)
         return -1;
 
-    uint8_t value;
-    if (mmu_read_u8(p_mmu, address + 1, &value) < 0)
+    uint8_t lsb, msb;
+
+    int ret = mmu_read_u8(p_mmu, address, &lsb);
+    ret += mmu_read_u8(p_mmu, address + 1, &msb);
+
+    if (ret < 0)
     {
         return -1;
     }
 
-    *data = value;
+    *data = msb;
     *data <<= 8;
+    *data |= lsb;
 
-    if (mmu_read_u8(p_mmu, address, &value) < 0)
-    {
-        return -1;
-    }
-
-    *data |= value;
     return 0;
 }
 
@@ -285,12 +282,10 @@ int mmu_write_u16(mmu_t *p_mmu, uint16_t address, uint16_t data)
     if (!p_mmu)
         return -1;
 
-    if (mmu_write_u8(p_mmu, address, (uint8_t)data) < 0)
-    {
-        return -1;
-    }
+    int ret = mmu_write_u8(p_mmu, address, (uint8_t)data);
+    ret += mmu_write_u8(p_mmu, address + 1, (uint8_t)(data >> 8));
 
-    if (mmu_write_u8(p_mmu, address + 1, (uint8_t)(data >> 8) < 0))
+    if (ret < 0)
     {
         return -1;
     }

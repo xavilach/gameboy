@@ -31,9 +31,12 @@ int cpu_execute(cpu_t *p_cpu)
 	if (!p_cpu)
 		return 0;
 
-	int cycles = opcode8_handler(p_cpu);
-
 	cpu_irq_process(p_cpu);
+
+	if (p_cpu->halted)
+		return 4;
+
+	int cycles = opcode8_handler(p_cpu);
 
 	return cycles;
 }

@@ -3,6 +3,8 @@
 #include "SDL2/SDL.h"
 #include <SDL2/SDL_ttf.h>
 
+#include "gb.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -16,6 +18,7 @@ typedef struct display_s
 
 static void get_text_and_rect(SDL_Renderer *renderer, int x, int y, char *text, TTF_Font *font, SDL_Texture **texture, SDL_Rect *rect);
 static void display_dbg_address(display_t *p_display, gb_t *p_gb, uint16_t address, int size, int line, int column);
+static void display_dbg_cpu(display_t *p_display, gb_t *p_gb);
 
 int display_init(void)
 {
@@ -135,6 +138,11 @@ int display_dbg_registers(display_t *p_display, gb_t *p_gb, dbg_registers_t regs
         display_dbg_address(p_display, p_gb, 0xFF04, 4, 4, 0);
         break;
 
+    case DBG_REGISTERS_CPU:
+        display_text(p_display, 0, 40, "CPU");
+        display_dbg_cpu(p_display, p_gb);
+        break;
+
     case DBG_REGISTERS_NONE:
         break;
 
@@ -242,6 +250,27 @@ static void display_dbg_address(display_t *p_display, gb_t *p_gb, uint16_t addre
 
         display_text(p_display, column * 120, 20 * (line + i), str);
     }
+}
+
+static void display_dbg_cpu(display_t *p_display, gb_t *p_gb)
+{
+    char buffer[50];
+    char str[40];
+
+    snprintf(str, 40, "AF:0x%04x", p_gb->cpu->reg_AF);
+    display_text(p_display, 0 * 120, 20 * (4 + 0), str);
+    snprintf(str, 40, "BC:0x%04x", p_gb->cpu->reg_BC);
+    display_text(p_display, 0 * 120, 20 * (4 + 1), str);
+    snprintf(str, 40, "DE:0x%04x", p_gb->cpu->reg_DE);
+    display_text(p_display, 0 * 120, 20 * (4 + 2), str);
+    snprintf(str, 40, "HL:0x%04x", p_gb->cpu->reg_HL);
+    display_text(p_display, 0 * 120, 20 * (4 + 3), str);
+    snprintf(str, 40, "PC:0x%04x", p_gb->cpu->pc);
+    display_text(p_display, 0 * 120, 20 * (4 + 4), str);
+    snprintf(str, 40, "SP:0x%04x", p_gb->cpu->sp);
+    display_text(p_display, 0 * 120, 20 * (4 + 5), str);
+    snprintf(str, 40, "IME:%d", p_gb->cpu->irq_master_enable);
+    display_text(p_display, 0 * 120, 20 * (4 + 6), str);
 }
 
 /*

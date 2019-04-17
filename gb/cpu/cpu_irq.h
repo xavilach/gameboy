@@ -40,7 +40,7 @@ static inline void cpu_irq_process(cpu_t *p_cpu)
     }
 
     /* Process IRQs */
-    if (p_cpu->irq_master_enable)
+    if (p_cpu->irq_master_enable || p_cpu->halted)
     {
         uint8_t irq_flag, irq_enable;
         (void)mmu_read_u8(p_cpu->p_mmu, IF_REG_ADDR, &irq_flag);
@@ -48,19 +48,26 @@ static inline void cpu_irq_process(cpu_t *p_cpu)
 
         irq_flag &= (irq_enable & 0x1F); // Mask disabled irqs.
 
-        if (irq_flag)
+        if (0 != irq_flag)
         {
             for (int i = 0; i < IRQ_COUNT; i++)
             {
                 uint8_t mask = 1 << i;
                 if (mask & irq_flag)
                 {
-                    push_pc(p_cpu); //Push PC on stack.
+                    if (p_cpu->irq_master_enable)
+                    {
+                        irq_flag &= ~mask; // Clear interrupt flag.
+                        (void)mmu_write_u8(p_cpu->p_mmu, IF_REG_ADDR, irq_flag);
 
-                    p_cpu->irq_master_enable = 0; // Disable interrupts.
-                    irq_flag &= ~mask;            // Clear interrupt flag.
+                        p_cpu->irq_master_enable = 0; // Disable interrupts.
 
-                    jump(p_cpu, VECTOR_TABLE[i]);
+                        push_pc(p_cpu); //Push PC on stack.
+
+                        jump(p_cpu, VECTOR_TABLE[i]);
+                    }
+
+                    p_cpu->halted = 0;
                     break;
                 }
             }

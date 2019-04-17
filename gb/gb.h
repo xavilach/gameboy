@@ -2,8 +2,20 @@
 #define GB_H_
 
 #include "screen.h"
+#include "mmu.h"
+#include "cpu.h"
+#include "ppu.h"
+#include "cpu_def.h"
 
-typedef struct gb_s gb_t;
+//typedef struct gb_s gb_t;
+
+typedef struct gb_s
+{
+    mmu_t *mmu;
+    cpu_t *cpu;
+    ppu_t *ppu;
+    screen_t *screen;
+} gb_t;
 
 void gb_init(void);
 

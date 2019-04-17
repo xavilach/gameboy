@@ -32,7 +32,7 @@ typedef enum reg1_e
     REG1_BC = 0b00,
     REG1_DE = 0b01,
     REG1_HL = 0b10,
-    REG1_PC = 0b11
+    REG1_AF = 0b11
 } reg1_t;
 
 typedef enum mnemonic_e
@@ -117,16 +117,19 @@ static inline uint8_t pop_u8(cpu_t *p_cpu)
 
 static inline void push_u16(cpu_t *p_cpu, uint16_t u16)
 {
-    push_u8(p_cpu, u16);
-    push_u8(p_cpu, u16 >> 8);
+    uint8_t msb = u16 >> 8;
+    uint8_t lsb = u16;
+
+    push_u8(p_cpu, msb);
+    push_u8(p_cpu, lsb);
 }
 
 static inline uint16_t pop_u16(cpu_t *p_cpu)
 {
-    uint16_t u16 = pop_u8(p_cpu);
-    u16 <<= 8;
-    u16 |= pop_u8(p_cpu);
-    return u16;
+    uint16_t lsb = pop_u8(p_cpu);
+    uint16_t msb = pop_u8(p_cpu);
+
+    return ((msb << 8) | lsb);
 }
 
 static inline void push_pc(cpu_t *p_cpu)
@@ -153,11 +156,12 @@ static const char str_E[] = "E";
 static const char str_H[] = "H";
 static const char str_L[] = "L";
 static const char str_A[] = "A";
+
 static const char str_BC[] = "BC";
 static const char str_DE[] = "DE";
 static const char str_HL[] = "HL";
 static const char str_SP[] = "SP";
-static const char str_PC[] = "PC";
+static const char str_AF[] = "AF";
 
 static const char str_Z[] = "Z";
 static const char str_NZ[] = "NZ";
@@ -310,8 +314,8 @@ static inline const char *str_reg1(reg3_t r)
         return str_DE;
     case REG1_HL:
         return str_HL;
-    case REG1_PC:
-        return str_PC;
+    case REG1_AF:
+        return str_AF;
     default:
         assert(0);
         return 0;
@@ -331,8 +335,8 @@ static inline void set_reg1(cpu_t *p_cpu, reg1_t r, uint16_t value)
     case REG1_HL:
         p_cpu->reg_HL = value;
         break;
-    case REG1_PC:
-        p_cpu->pc = value;
+    case REG1_AF:
+        p_cpu->reg_AF = value & 0xFFF0;
         break;
     default:
         assert(0);
@@ -350,8 +354,8 @@ static inline uint16_t get_reg1(cpu_t *p_cpu, reg1_t r)
         return p_cpu->reg_DE;
     case REG1_HL:
         return p_cpu->reg_HL;
-    case REG1_PC:
-        return p_cpu->pc;
+    case REG1_AF:
+        return p_cpu->reg_AF & 0xFFF0;
     default:
         assert(0);
         return 0;

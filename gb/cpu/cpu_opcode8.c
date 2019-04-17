@@ -6,7 +6,12 @@
 #include "cpu_registers.h"
 
 #if 0
-#define DEBUG_PRINT(fmt, ...) printf(fmt, __VA_ARGS__)
+#define DBG_ENABLED
+static int debug_enabled = 0;
+
+#define DEBUG_PRINT(fmt, ...) \
+	if (debug_enabled)        \
+	printf(fmt, __VA_ARGS__)
 #else
 #define DEBUG_PRINT(fmt, ...) (void)0
 #endif /*NDEBUG*/
@@ -207,6 +212,11 @@ int opcode8_handler(cpu_t *p_cpu)
 	// Check whether opcode16 module was initialized.
 	assert(opcode8_handlers[0] != NULL);
 
+#ifdef DBG_ENABLED
+	if (p_cpu->pc > 0xFF)
+		debug_enabled = 1;
+#endif
+
 	uint8_t opcode;
 	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &opcode);
 
@@ -230,7 +240,7 @@ static int opcode8_LD_N_SP(cpu_t *p_cpu)
 
 	(void)mmu_write_u16(p_cpu->p_mmu, n, p_cpu->sp);
 
-	DEBUG_PRINT("%04x:LD (%04x) %04x\n", p_cpu->pc, n, p_cpu->sp);
+	DEBUG_PRINT("%04x:LD (%04x) SP [%04x]\n", p_cpu->pc, n, p_cpu->sp);
 	p_cpu->pc += 3;
 	return 20;
 }
@@ -239,8 +249,7 @@ static int opcode8_LD_R_N(cpu_t *p_cpu)
 {
 	uint8_t r;
 	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &r);
-	r >>= 4;
-	r &= 0x03;
+	r = (r >> 4) & 0x03;
 
 	uint16_t n;
 	(void)mmu_read_u16(p_cpu->p_mmu, p_cpu->pc + 1, &n);
@@ -263,12 +272,12 @@ static int opcode8_ADD_HL_R(cpu_t *p_cpu)
 	uint32_t sum = p_cpu->reg_HL + rv;
 
 	set_flag_N(p_cpu, 0);
-	set_flag_H(p_cpu, (((p_cpu->reg_HL & 0x0FFF) + (rv & 0x0FFF)) & 0x1000) >> 12);
-	set_flag_C(p_cpu, (sum >> 16) & 0x0001);
+	set_flag_H(p_cpu, (((p_cpu->reg_HL & 0x0FFF) + (rv & 0x0FFF)) & 0x1000) > 0x0FFF);
+	set_flag_C(p_cpu, (sum > 0xFFFF));
 
 	p_cpu->reg_HL = sum;
 
-	DEBUG_PRINT("%04x:ADD HL %s\n", p_cpu->pc, str_reg2(r));
+	DEBUG_PRINT("%04x:ADD HL %s [%04x]\n", p_cpu->pc, str_reg2(r), rv);
 	p_cpu->pc += 1;
 	return 8;
 }
@@ -281,10 +290,11 @@ static int opcode8_LD_R_A(cpu_t *p_cpu)
 	r &= 0x03;
 
 	uint16_t rv = get_reg2(p_cpu, r);
+	uint8_t a = get_msb(p_cpu->reg_AF);
 
-	(void)mmu_write_u8(p_cpu->p_mmu, rv, get_msb(p_cpu->reg_AF));
+	(void)mmu_write_u8(p_cpu->p_mmu, rv, a);
 
-	DEBUG_PRINT("%04x:LD (%s) A\n", p_cpu->pc, str_reg2(r));
+	DEBUG_PRINT("%04x:LD (%s) [%04x] A [%02x]\n", p_cpu->pc, str_reg2(r), rv, a);
 	p_cpu->pc += 1;
 	return 8;
 }
@@ -303,7 +313,7 @@ static int opcode8_LD_A_R(cpu_t *p_cpu)
 
 	set_msb(&(p_cpu->reg_AF), a);
 
-	DEBUG_PRINT("%04x:LD A (%s)\n", p_cpu->pc, str_reg2(r));
+	DEBUG_PRINT("%04x:LD A (%s) [%04x:%02x]\n", p_cpu->pc, str_reg2(r), rv, a);
 	p_cpu->pc += 1;
 	return 8;
 }
@@ -343,15 +353,15 @@ static int opcode8_INC_D(cpu_t *p_cpu)
 	d >>= 3;
 	d &= 0x07;
 
-	uint16_t dv = get_reg3(p_cpu, d);
-
-	set_flag_H(p_cpu, (((dv & 0x0F) + 1) & 0x10) >> 4);
+	uint8_t dv = get_reg3(p_cpu, d);
 
 	dv += 1;
+
 	set_reg3(p_cpu, d, dv);
 
-	set_flag_Z(p_cpu, 0 == dv);
-	set_flag_N(p_cpu, 1);
+	set_flag_Z(p_cpu, (0 == dv));
+	set_flag_N(p_cpu, 0);
+	set_flag_H(p_cpu, (0 == (dv & 0x0F)));
 
 	DEBUG_PRINT("%04x:INC %s\n", p_cpu->pc, str_reg3(d));
 	p_cpu->pc += 1;
@@ -363,14 +373,13 @@ static int opcode8_INC_HL(cpu_t *p_cpu)
 	uint8_t value;
 	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
-	set_flag_H(p_cpu, ((value & 0x0F) + 1) >> 4);
-
 	value += 1;
 
-	set_flag_Z(p_cpu, 0 == value);
-	set_flag_N(p_cpu, 1);
-
 	(void)mmu_write_u8(p_cpu->p_mmu, p_cpu->reg_HL, value);
+
+	set_flag_Z(p_cpu, (0 == value));
+	set_flag_N(p_cpu, 0);
+	set_flag_H(p_cpu, (0 == (value & 0x0F)));
 
 	DEBUG_PRINT("%04x:INC (HL)\n", p_cpu->pc);
 	p_cpu->pc += 1;
@@ -384,16 +393,15 @@ static int opcode8_DEC_D(cpu_t *p_cpu)
 	d >>= 3;
 	d &= 0x07;
 
-	uint16_t dv = get_reg3(p_cpu, d);
-
-	set_flag_H(p_cpu, 0 == dv);
+	uint8_t dv = get_reg3(p_cpu, d);
 
 	dv -= 1;
 
 	set_reg3(p_cpu, d, dv);
 
-	set_flag_Z(p_cpu, 0 == dv);
+	set_flag_Z(p_cpu, (0 == dv));
 	set_flag_N(p_cpu, 1);
+	set_flag_H(p_cpu, (0x0F == (dv & 0x0F)));
 
 	DEBUG_PRINT("%04x:DEC %s\n", p_cpu->pc, str_reg3(d));
 	p_cpu->pc += 1;
@@ -405,14 +413,13 @@ static int opcode8_DEC_HL(cpu_t *p_cpu)
 	uint8_t value;
 	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &value);
 
-	set_flag_H(p_cpu, 0 == value);
-
 	value -= 1;
 
-	set_flag_Z(p_cpu, 0 == value);
-	set_flag_N(p_cpu, 1);
-
 	(void)mmu_write_u8(p_cpu->p_mmu, p_cpu->reg_HL, value);
+
+	set_flag_Z(p_cpu, (0 == value));
+	set_flag_N(p_cpu, 1);
+	set_flag_H(p_cpu, (0x0F == (value & 0x0F)));
 
 	DEBUG_PRINT("%04x:DEC (HL)\n", p_cpu->pc);
 	p_cpu->pc += 1;
@@ -456,7 +463,7 @@ static int opcode8_RLCA(cpu_t *p_cpu)
 
 	set_msb(&(p_cpu->reg_AF), reg_a);
 
-	set_flag_Z(p_cpu, reg_a == 0);
+	set_flag_Z(p_cpu, 0);
 	set_flag_N(p_cpu, 0);
 	set_flag_H(p_cpu, 0);
 	set_flag_C(p_cpu, flag_c);
@@ -474,7 +481,7 @@ static int opcode8_RRCA(cpu_t *p_cpu)
 
 	set_msb(&(p_cpu->reg_AF), reg_a);
 
-	set_flag_Z(p_cpu, reg_a == 0);
+	set_flag_Z(p_cpu, 0);
 	set_flag_N(p_cpu, 0);
 	set_flag_H(p_cpu, 0);
 	set_flag_C(p_cpu, flag_c);
@@ -492,7 +499,7 @@ static int opcode8_RLA(cpu_t *p_cpu)
 
 	set_msb(&(p_cpu->reg_AF), reg_a);
 
-	set_flag_Z(p_cpu, reg_a == 0);
+	set_flag_Z(p_cpu, 0);
 	set_flag_N(p_cpu, 0);
 	set_flag_H(p_cpu, 0);
 	set_flag_C(p_cpu, flag_c);
@@ -510,7 +517,7 @@ static int opcode8_RRA(cpu_t *p_cpu)
 
 	set_msb(&(p_cpu->reg_AF), reg_a);
 
-	set_flag_Z(p_cpu, reg_a == 0);
+	set_flag_Z(p_cpu, 0);
 	set_flag_N(p_cpu, 0);
 	set_flag_H(p_cpu, 0);
 	set_flag_C(p_cpu, flag_c);
@@ -554,7 +561,7 @@ static int opcode8_JR_F_N(cpu_t *p_cpu)
 
 	uint16_t newPC = p_cpu->pc + 2 + (int8_t)n;
 
-	DEBUG_PRINT("%04x:JR %s %04x\n", p_cpu->pc, str_mnemonic(m), newPC);
+	DEBUG_PRINT("%04x:JR %s[%01x] %04x\n", p_cpu->pc, str_mnemonic(m), get_lsb(p_cpu->reg_AF), newPC);
 	if (get_mnemonic(p_cpu, m))
 	{
 		p_cpu->pc = newPC;
@@ -568,10 +575,13 @@ static int opcode8_JR_F_N(cpu_t *p_cpu)
 
 static int opcode8_LDI_HL_A(cpu_t *p_cpu)
 {
-	(void)mmu_write_u8(p_cpu->p_mmu, p_cpu->reg_HL, get_msb(p_cpu->reg_AF));
+	uint8_t a = get_msb(p_cpu->reg_AF);
+
+	(void)mmu_write_u8(p_cpu->p_mmu, p_cpu->reg_HL, a);
+
 	p_cpu->reg_HL += 1;
 
-	DEBUG_PRINT("%04x:LDI (HL) A\n", p_cpu->pc);
+	DEBUG_PRINT("%04x:LDI (HL) A [%02x]\n", p_cpu->pc, a);
 	p_cpu->pc += 1;
 	return 8;
 }
@@ -581,20 +591,24 @@ static int opcode8_LDI_A_HL(cpu_t *p_cpu)
 	uint8_t a;
 	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &a);
 
-	set_msb(&(p_cpu->reg_AF), a);
 	p_cpu->reg_HL += 1;
 
-	DEBUG_PRINT("%04x:LDI A (HL)\n", p_cpu->pc);
+	set_msb(&(p_cpu->reg_AF), a);
+
+	DEBUG_PRINT("%04x:LDI A (HL) [%02x]\n", p_cpu->pc, a);
 	p_cpu->pc += 1;
 	return 8;
 }
 
 static int opcode8_LDD_HL_A(cpu_t *p_cpu)
 {
-	(void)mmu_write_u8(p_cpu->p_mmu, p_cpu->reg_HL, get_msb(p_cpu->reg_AF));
+	uint8_t a = get_msb(p_cpu->reg_AF);
+
+	(void)mmu_write_u8(p_cpu->p_mmu, p_cpu->reg_HL, a);
+
 	p_cpu->reg_HL -= 1;
 
-	DEBUG_PRINT("%04x:LDD (HL) A\n", p_cpu->pc);
+	DEBUG_PRINT("%04x:LDD (HL) A [%02x]\n", p_cpu->pc, a);
 	p_cpu->pc += 1;
 	return 8;
 }
@@ -604,10 +618,11 @@ static int opcode8_LDD_A_HL(cpu_t *p_cpu)
 	uint8_t a;
 	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->reg_HL, &a);
 
-	set_msb(&(p_cpu->reg_AF), a);
 	p_cpu->reg_HL -= 1;
 
-	DEBUG_PRINT("%04x:LDD A (HL)\n", p_cpu->pc);
+	set_msb(&(p_cpu->reg_AF), a);
+
+	DEBUG_PRINT("%04x:LDD A (HL) [%02x]\n", p_cpu->pc, a);
 	p_cpu->pc += 1;
 	return 8;
 }
@@ -619,38 +634,52 @@ static int opcode8_DAA(cpu_t *p_cpu)
 	uint8_t flag_c = get_flag_C(p_cpu);
 	uint8_t flag_h = get_flag_H(p_cpu);
 	uint8_t flag_n = get_flag_N(p_cpu);
-	uint8_t reg_a = get_msb(p_cpu->reg_AF);
+
+	uint16_t reg_a = get_msb(p_cpu->reg_AF);
 
 	set_flag_C(p_cpu, 0);
 
 	if (!flag_n)
 	{
-		if (flag_c || reg_a > 0x99)
-		{
-			reg_a += 0x60;
-			set_flag_C(p_cpu, 1);
-		}
-		if (flag_h || (reg_a & 0x0F) > 0x09)
+		if (flag_h || ((reg_a & 0x0F) > 0x09))
 		{
 			reg_a += 0x6;
+		}
+		if (flag_c || (reg_a > 0x9F))
+		{
+			reg_a += 0x60;
 		}
 	}
 	else
 	{
+		if (flag_h)
+		{
+			reg_a -= 0x06;
+			if (!flag_c)
+			{
+				reg_a &= 0xFF;
+			}
+		}
 		if (flag_c)
 		{
 			reg_a -= 0x60;
 		}
-		if (flag_h)
-		{
-			reg_a -= 0x6;
-		}
 	}
 
-	set_flag_Z(p_cpu, reg_a == 0);
+	set_flag_Z(p_cpu, 0);
 	set_flag_H(p_cpu, 0);
 
-	DEBUG_PRINT("%04x:DAA\n", p_cpu->pc);
+	if (reg_a & 0x0100)
+	{
+		set_flag_C(p_cpu, 1);
+	}
+	reg_a &= 0xFF;
+	if (!reg_a)
+	{
+		set_flag_Z(p_cpu, 1);
+	}
+
+	DEBUG_PRINT("%04x:DAA\n", p_cpu->pc, get_msb(p_cpu->reg_AF), reg_a);
 	p_cpu->pc += 1;
 
 	return 4;
@@ -673,6 +702,8 @@ static int opcode8_CPL(cpu_t *p_cpu)
 //Set Carry flag
 static int opcode8_SCF(cpu_t *p_cpu)
 {
+	set_flag_N(p_cpu, 0);
+	set_flag_H(p_cpu, 0);
 	set_flag_C(p_cpu, 1);
 
 	DEBUG_PRINT("%04x:SCF\n", p_cpu->pc);
@@ -683,6 +714,8 @@ static int opcode8_SCF(cpu_t *p_cpu)
 //Complement carry flag.
 static int opcode8_CCF(cpu_t *p_cpu)
 {
+	set_flag_N(p_cpu, 0);
+	set_flag_H(p_cpu, 0);
 	set_flag_C(p_cpu, ~get_flag_C(p_cpu));
 
 	DEBUG_PRINT("%04x:CCF\n", p_cpu->pc);
@@ -698,9 +731,11 @@ static int opcode8_LD_D_D(cpu_t *p_cpu)
 	uint8_t d0 = (opcode >> 3) & 0x07;
 	uint8_t d1 = (opcode >> 0) & 0x07;
 
-	set_reg3(p_cpu, d0, get_reg3(p_cpu, d1));
+	uint8_t dv = get_reg3(p_cpu, d1);
 
-	DEBUG_PRINT("%04x:LD %s %s\n", p_cpu->pc, str_reg3(d0), str_reg3(d1));
+	set_reg3(p_cpu, d0, dv);
+
+	DEBUG_PRINT("%04x:LD %s %s [%02x]\n", p_cpu->pc, str_reg3(d0), str_reg3(d1), dv);
 	p_cpu->pc += 1;
 	return 4;
 }
@@ -717,7 +752,7 @@ static int opcode8_LD_D_HL(cpu_t *p_cpu)
 
 	set_reg3(p_cpu, d, value);
 
-	DEBUG_PRINT("%04x:LD %s (HL)\n", p_cpu->pc, str_reg3(d));
+	DEBUG_PRINT("%04x:LD %s (HL) [%02x]\n", p_cpu->pc, str_reg3(d), value);
 	p_cpu->pc += 1;
 	return 8;
 }
@@ -728,9 +763,11 @@ static int opcode8_LD_HL_D(cpu_t *p_cpu)
 	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc, &d);
 	d &= 0x07;
 
-	(void)mmu_write_u8(p_cpu->p_mmu, p_cpu->reg_HL, get_reg3(p_cpu, d));
+	uint8_t dv = get_reg3(p_cpu, d);
 
-	DEBUG_PRINT("%04x:LD (HL) %s\n", p_cpu->pc, str_reg3(d));
+	(void)mmu_write_u8(p_cpu->p_mmu, p_cpu->reg_HL, dv);
+
+	DEBUG_PRINT("%04x:LD (HL) %s [%02x]\n", p_cpu->pc, str_reg3(d), dv);
 	p_cpu->pc += 1;
 	return 8;
 }
@@ -738,6 +775,8 @@ static int opcode8_LD_HL_D(cpu_t *p_cpu)
 //Power down CPU until an interrupt occurs.
 static int opcode8_HALT(cpu_t *p_cpu)
 {
+	p_cpu->halted = 1;
+
 	DEBUG_PRINT("%04x:HALT\n", p_cpu->pc);
 	p_cpu->pc += 1;
 	return 4;
@@ -753,7 +792,7 @@ static int opcode8_ADD_A_D(cpu_t *p_cpu)
 
 	alu_ADD(p_cpu, dv);
 
-	DEBUG_PRINT("%04x:ADD A %s\n", p_cpu->pc, str_reg3(d));
+	DEBUG_PRINT("%04x:ADD A %s [%02x]\n", p_cpu->pc, str_reg3(d), dv);
 	p_cpu->pc += 1;
 	return 4;
 }
@@ -768,7 +807,7 @@ static int opcode8_ADC_A_D(cpu_t *p_cpu)
 
 	alu_ADC(p_cpu, dv);
 
-	DEBUG_PRINT("%04x:ADC A %s\n", p_cpu->pc, str_reg3(d));
+	DEBUG_PRINT("%04x:ADC A %s [%02x]\n", p_cpu->pc, str_reg3(d), dv);
 	p_cpu->pc += 1;
 	return 4;
 }
@@ -783,7 +822,7 @@ static int opcode8_SUB_A_D(cpu_t *p_cpu)
 
 	alu_SUB(p_cpu, dv);
 
-	DEBUG_PRINT("%04x:SUB A %s\n", p_cpu->pc, str_reg3(d));
+	DEBUG_PRINT("%04x:SUB A %s [%02x]\n", p_cpu->pc, str_reg3(d), dv);
 	p_cpu->pc += 1;
 	return 4;
 }
@@ -798,7 +837,7 @@ static int opcode8_SBC_A_D(cpu_t *p_cpu)
 
 	alu_SBC(p_cpu, dv);
 
-	DEBUG_PRINT("%04x:SBC A %s\n", p_cpu->pc, str_reg3(d));
+	DEBUG_PRINT("%04x:SBC A %s [%02x]\n", p_cpu->pc, str_reg3(d), dv);
 	p_cpu->pc += 1;
 	return 4;
 }
@@ -813,7 +852,7 @@ static int opcode8_AND_A_D(cpu_t *p_cpu)
 
 	alu_AND(p_cpu, dv);
 
-	DEBUG_PRINT("%04x:AND A %s\n", p_cpu->pc, str_reg3(d));
+	DEBUG_PRINT("%04x:AND A %s [%02x]\n", p_cpu->pc, str_reg3(d), dv);
 	p_cpu->pc += 1;
 	return 4;
 }
@@ -828,7 +867,7 @@ static int opcode8_XOR_A_D(cpu_t *p_cpu)
 
 	alu_XOR(p_cpu, dv);
 
-	DEBUG_PRINT("%04x:XOR A %s\n", p_cpu->pc, str_reg3(d));
+	DEBUG_PRINT("%04x:XOR A %s [%02x]\n", p_cpu->pc, str_reg3(d), dv);
 	p_cpu->pc += 1;
 	return 4;
 }
@@ -843,7 +882,7 @@ static int opcode8_OR_A_D(cpu_t *p_cpu)
 
 	alu_OR(p_cpu, dv);
 
-	DEBUG_PRINT("%04x:OR A %s\n", p_cpu->pc, str_reg3(d));
+	DEBUG_PRINT("%04x:OR A %s [%02x]\n", p_cpu->pc, str_reg3(d), dv);
 	p_cpu->pc += 1;
 	return 4;
 }
@@ -858,7 +897,7 @@ static int opcode8_CP_A_D(cpu_t *p_cpu)
 
 	alu_CP(p_cpu, dv);
 
-	DEBUG_PRINT("%04x:CP A %s\n", p_cpu->pc, str_reg3(d));
+	DEBUG_PRINT("%04x:CP [%02x] A [%02x] %s [%02x]\n", p_cpu->pc, get_lsb(p_cpu->reg_AF), get_msb(p_cpu->reg_AF), str_reg3(d), dv);
 	p_cpu->pc += 1;
 	return 4;
 }
@@ -870,7 +909,7 @@ static int opcode8_ADD_A_HL(cpu_t *p_cpu)
 
 	alu_ADD(p_cpu, value);
 
-	DEBUG_PRINT("%04x:ADD A (HL)\n", p_cpu->pc);
+	DEBUG_PRINT("%04x:ADD A (HL) [%02x]\n", p_cpu->pc, value);
 	p_cpu->pc += 1;
 	return 8;
 }
@@ -882,7 +921,7 @@ static int opcode8_ADC_A_HL(cpu_t *p_cpu)
 
 	alu_ADC(p_cpu, value);
 
-	DEBUG_PRINT("%04x:ADC A (HL)\n", p_cpu->pc);
+	DEBUG_PRINT("%04x:ADC A (HL) [%02x]\n", p_cpu->pc, value);
 	p_cpu->pc += 1;
 	return 8;
 }
@@ -894,7 +933,7 @@ static int opcode8_SUB_A_HL(cpu_t *p_cpu)
 
 	alu_SUB(p_cpu, value);
 
-	DEBUG_PRINT("%04x:SUB A (HL)\n", p_cpu->pc);
+	DEBUG_PRINT("%04x:SUB A (HL) [%02x]\n", p_cpu->pc, value);
 	p_cpu->pc += 1;
 	return 8;
 }
@@ -906,7 +945,7 @@ static int opcode8_SBC_A_HL(cpu_t *p_cpu)
 
 	alu_SBC(p_cpu, value);
 
-	DEBUG_PRINT("%04x:SBC A (HL)\n", p_cpu->pc);
+	DEBUG_PRINT("%04x:SBC A (HL) [%02x]\n", p_cpu->pc, value);
 	p_cpu->pc += 1;
 	return 8;
 }
@@ -918,7 +957,7 @@ static int opcode8_AND_A_HL(cpu_t *p_cpu)
 
 	alu_AND(p_cpu, value);
 
-	DEBUG_PRINT("%04x:AND A (HL)\n", p_cpu->pc);
+	DEBUG_PRINT("%04x:AND A (HL) [%02x]\n", p_cpu->pc, value);
 	p_cpu->pc += 1;
 	return 8;
 }
@@ -930,7 +969,7 @@ static int opcode8_XOR_A_HL(cpu_t *p_cpu)
 
 	alu_XOR(p_cpu, value);
 
-	DEBUG_PRINT("%04x:XOR A (HL)\n", p_cpu->pc);
+	DEBUG_PRINT("%04x:XOR A (HL) [%02x]\n", p_cpu->pc, value);
 	p_cpu->pc += 1;
 	return 8;
 }
@@ -942,7 +981,7 @@ static int opcode8_OR_A_HL(cpu_t *p_cpu)
 
 	alu_OR(p_cpu, value);
 
-	DEBUG_PRINT("%04x:OR A (HL)\n", p_cpu->pc);
+	DEBUG_PRINT("%04x:OR A (HL) [%02x]\n", p_cpu->pc, value);
 	p_cpu->pc += 1;
 	return 8;
 }
@@ -954,7 +993,7 @@ static int opcode8_CP_A_HL(cpu_t *p_cpu)
 
 	alu_CP(p_cpu, value);
 
-	DEBUG_PRINT("%04x:CP A (HL)\n", p_cpu->pc);
+	DEBUG_PRINT("%04x:CP A (HL) [%02x]\n", p_cpu->pc, value);
 	p_cpu->pc += 1;
 	return 8;
 }
@@ -1062,9 +1101,11 @@ static int opcode8_POP_R(cpu_t *p_cpu)
 	r >>= 4;
 	r &= 0x03;
 
-	set_reg1(p_cpu, r, pop_u16(p_cpu));
+	uint16_t value = pop_u16(p_cpu);
 
-	DEBUG_PRINT("%04x:POP %s\n", p_cpu->pc, str_reg1(r));
+	set_reg1(p_cpu, r, value);
+
+	DEBUG_PRINT("%04x:POP %s [%04x]\n", p_cpu->pc, str_reg1(r), value);
 	p_cpu->pc += 1;
 	return 12;
 }
@@ -1076,9 +1117,11 @@ static int opcode8_PUSH_R(cpu_t *p_cpu)
 	r >>= 4;
 	r &= 0x03;
 
-	push_u16(p_cpu, get_reg1(p_cpu, r));
+	uint16_t value = get_reg1(p_cpu, r);
 
-	DEBUG_PRINT("%04x:PUSH %s\n", p_cpu->pc, str_reg1(r));
+	push_u16(p_cpu, value);
+
+	DEBUG_PRINT("%04x:PUSH %s [%04x]\n", p_cpu->pc, str_reg1(r), value);
 	p_cpu->pc += 1;
 	return 16;
 }
@@ -1120,7 +1163,7 @@ static int opcode8_RET_F(cpu_t *p_cpu)
 	m >>= 3;
 	m &= 0x03;
 
-	DEBUG_PRINT("%04x:RET %s\n", p_cpu->pc, str_mnemonic(m));
+	DEBUG_PRINT("%04x:RET %s [%01x]\n", p_cpu->pc, str_mnemonic(m), get_lsb(p_cpu->reg_AF));
 	if (get_mnemonic(p_cpu, m))
 	{
 		pop_pc(p_cpu);
@@ -1152,7 +1195,7 @@ static int opcode8_JP_F_N(cpu_t *p_cpu)
 	uint16_t n;
 	(void)mmu_read_u16(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
-	DEBUG_PRINT("%04x:JP %s %04x\n", p_cpu->pc, str_mnemonic(m), n);
+	DEBUG_PRINT("%04x:JP %s [%02x] %04x\n", p_cpu->pc, str_mnemonic(m), get_lsb(p_cpu->reg_AF), n);
 	if (get_mnemonic(p_cpu, m))
 	{
 		jump(p_cpu, n);
@@ -1189,7 +1232,7 @@ static int opcode8_CALL_F_N(cpu_t *p_cpu)
 	uint16_t n;
 	(void)mmu_read_u16(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
-	DEBUG_PRINT("%04x:CALL %s %04x\n", p_cpu->pc, str_mnemonic(m), n);
+	DEBUG_PRINT("%04x:CALL %s [%01x] %04x\n", p_cpu->pc, str_mnemonic(m), get_lsb(p_cpu->reg_AF), n);
 
 	p_cpu->pc += 3;
 	if (get_mnemonic(p_cpu, m))
@@ -1206,16 +1249,14 @@ static int opcode8_ADD_SP_N(cpu_t *p_cpu)
 	uint8_t n;
 	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
-	DEBUG_PRINT("%04x:ADD SP %02x\n", p_cpu->pc, n);
-
-	uint32_t result = p_cpu->sp + n;
-	set_flag_N(p_cpu, 0);
 	set_flag_Z(p_cpu, 0);
-	set_flag_H(p_cpu, ((p_cpu->sp & 0x0FFF) + n) >> 12);
-	set_flag_C(p_cpu, result >> 16);
+	set_flag_N(p_cpu, 0);
+	set_flag_C(p_cpu, ((p_cpu->sp & 0xFF) + n) > 0xFF);
+	set_flag_H(p_cpu, ((p_cpu->sp & 0x0F) + (n & 0x0F)) > 0x0F);
 
-	p_cpu->sp = result;
+	p_cpu->sp = p_cpu->sp + (int8_t)n;
 
+	DEBUG_PRINT("%04x:ADD SP %02x\n", p_cpu->pc, n);
 	p_cpu->pc += 2;
 	return 16;
 }
@@ -1225,16 +1266,14 @@ static int opcode8_LD_HL_SP_N(cpu_t *p_cpu)
 	uint8_t n;
 	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
-	DEBUG_PRINT("%04x:LD HL SP+%02x\n", p_cpu->pc, n);
+	p_cpu->reg_HL = p_cpu->sp + (int8_t)n;
 
-	uint32_t result = p_cpu->sp + n;
-	set_flag_N(p_cpu, 0);
 	set_flag_Z(p_cpu, 0);
-	set_flag_H(p_cpu, ((p_cpu->sp & 0x0FFF) + n) >> 12);
-	set_flag_C(p_cpu, result >> 16);
+	set_flag_N(p_cpu, 0);
+	set_flag_H(p_cpu, ((p_cpu->sp & 0x0F) + (n & 0x0F)) > 0x0F);
+	set_flag_C(p_cpu, ((p_cpu->sp & 0xFF) + n) > 0xFF);
 
-	p_cpu->reg_HL = result;
-
+	DEBUG_PRINT("%04x:LD HL SP+%02x [%04x]\n", p_cpu->pc, n, p_cpu->reg_HL);
 	p_cpu->pc += 2;
 	return 12;
 }
@@ -1244,9 +1283,11 @@ static int opcode8_LD_FF00_N_A(cpu_t *p_cpu)
 	uint8_t n;
 	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
-	(void)mmu_write_u8(p_cpu->p_mmu, 0xFF00 + n, get_msb(p_cpu->reg_AF));
+	uint8_t a = get_msb(p_cpu->reg_AF);
 
-	DEBUG_PRINT("%04x:LD (FF00+%02x) A\n", p_cpu->pc, n);
+	(void)mmu_write_u8(p_cpu->p_mmu, (uint16_t)0xFF00 + n, a);
+
+	DEBUG_PRINT("%04x:LD (%04x) A\n", p_cpu->pc, 0xFF00 + n, a);
 	p_cpu->pc += 2;
 	return 12;
 }
@@ -1257,32 +1298,38 @@ static int opcode8_LD_A_FF00_N(cpu_t *p_cpu)
 	(void)mmu_read_u8(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
 	uint8_t a;
-	(void)mmu_read_u8(p_cpu->p_mmu, 0xFF00 + n, &a);
+	(void)mmu_read_u8(p_cpu->p_mmu, (uint16_t)0xFF00 + n, &a);
 
-	DEBUG_PRINT("%04x:LD A (FF00+%02x)\n", p_cpu->pc, n);
 	set_msb(&(p_cpu->reg_AF), a);
 
+	DEBUG_PRINT("%04x:LD A (%04x) [%02x]\n", p_cpu->pc, 0xFF00 + n, a);
 	p_cpu->pc += 2;
 	return 12;
 }
 
 static int opcode8_LD_C_A(cpu_t *p_cpu)
 {
-	(void)mmu_write_u8(p_cpu->p_mmu, 0xFF00 + get_lsb(p_cpu->reg_BC), get_msb(p_cpu->reg_AF));
+	uint16_t addr = (uint16_t)0xFF00 + get_lsb(p_cpu->reg_BC);
 
-	DEBUG_PRINT("%04x:LD (FF00+C) A\n", p_cpu->pc);
+	uint8_t a = get_msb(p_cpu->reg_AF);
+
+	(void)mmu_write_u8(p_cpu->p_mmu, addr, a);
+
+	DEBUG_PRINT("%04x:LD (%04x) A [%02x]\n", p_cpu->pc, addr, a);
 	p_cpu->pc += 1;
 	return 8;
 }
 
 static int opcode8_LD_A_C(cpu_t *p_cpu)
 {
+	uint16_t addr = (uint16_t)0xFF00 + get_lsb(p_cpu->reg_BC);
+
 	uint8_t a;
-	(void)mmu_read_u8(p_cpu->p_mmu, 0xFF00 + get_lsb(p_cpu->reg_BC), &a);
+	(void)mmu_read_u8(p_cpu->p_mmu, addr, &a);
 
 	set_msb(&(p_cpu->reg_AF), a);
 
-	DEBUG_PRINT("%04x:LD A (FF00+C)\n", p_cpu->pc);
+	DEBUG_PRINT("%04x:LD A (%04x) [%02x]\n", p_cpu->pc, addr, a);
 	p_cpu->pc += 1;
 	return 8;
 }
@@ -1292,9 +1339,10 @@ static int opcode8_LD_N_A(cpu_t *p_cpu)
 	uint16_t n;
 	(void)mmu_read_u16(p_cpu->p_mmu, p_cpu->pc + 1, &n);
 
-	(void)mmu_write_u8(p_cpu->p_mmu, n, get_msb(p_cpu->reg_AF));
+	uint8_t a = get_msb(p_cpu->reg_AF);
+	(void)mmu_write_u8(p_cpu->p_mmu, n, a);
 
-	DEBUG_PRINT("%04x:LD (%04x) A\n", p_cpu->pc, n);
+	DEBUG_PRINT("%04x:LD (%04x) A [%02x]\n", p_cpu->pc, n, a);
 	p_cpu->pc += 3;
 	return 8;
 }
@@ -1309,7 +1357,7 @@ static int opcode8_LD_A_N(cpu_t *p_cpu)
 
 	set_msb(&(p_cpu->reg_AF), a);
 
-	DEBUG_PRINT("%04x:LD A (%04x)\n", p_cpu->pc, n);
+	DEBUG_PRINT("%04x:LD A (%04x) [%02x]\n", p_cpu->pc, n, a);
 	p_cpu->pc += 3;
 	return 8;
 }
