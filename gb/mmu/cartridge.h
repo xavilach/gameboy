@@ -71,12 +71,30 @@ typedef struct cartridge_header_s
 
 } cartridge_header_t;
 
+typedef struct cartridge_s cartridge_t;
+
+typedef int (*cartridge_read_rom_access_t)(cartridge_t *p_cartridge, uint16_t address, uint8_t *data);
+typedef int (*cartridge_write_rom_access_t)(cartridge_t *p_cartridge, uint16_t address, uint8_t data);
+typedef int (*cartridge_read_ram_access_t)(cartridge_t *p_cartridge, uint16_t address, uint8_t *data);
+typedef int (*cartridge_write_ram_access_t)(cartridge_t *p_cartridge, uint16_t address, uint8_t data);
+
 typedef struct cartridge_s
 {
     cartridge_header_t header;
 
     uint8_t *rom;
     uint8_t *ram;
+
+    uint8_t rom_bank;
+    uint8_t ram_bank;
+    int ram_banking_mode;
+    int ram_enabled;
+
+    cartridge_read_rom_access_t read_rom;
+    cartridge_write_rom_access_t write_rom;
+    cartridge_read_ram_access_t read_ram;
+    cartridge_write_ram_access_t write_ram;
+
 } cartridge_t;
 
 cartridge_t *cartridge_allocate(char *path);

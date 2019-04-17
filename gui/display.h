@@ -12,6 +12,7 @@ typedef enum dbg_registers_e
     DBG_REGISTERS_SERIAL,
     DBG_REGISTERS_TIMER,
     DBG_REGISTERS_PPU,
+    DBG_REGISTERS_CPU,
     DBG_REGISTERS_MAX
 } dbg_registers_t;
 

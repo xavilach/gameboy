@@ -53,6 +53,8 @@ int main(int argc, char *argv[])
 
 		(void)gb_execute(p_gb, 1000.0 / 60.0);
 
+		unsigned int computeTime = SDL_GetTicks() - startTime;
+
 		SDL_Event event;
 		while (SDL_PollEvent(&event))
 		{
@@ -74,7 +76,7 @@ int main(int argc, char *argv[])
 					break;
 
 				case SDL_SCANCODE_P:
-					regs = (regs - 1) % DBG_REGISTERS_MAX;
+					regs = ((regs - 1) + DBG_REGISTERS_MAX) % DBG_REGISTERS_MAX;
 					break;
 
 				default:
@@ -95,7 +97,7 @@ int main(int argc, char *argv[])
 		unsigned int frameTime = (int)(1000.0 / 60.0);
 
 		char str[40];
-		(void)snprintf(str, 40, "Idle %d", ((frameTime - delta) * 100) / frameTime);
+		(void)snprintf(str, 40, "Compute time %d", computeTime);
 		display_text(p_display, 0, 0, str);
 
 		display_refresh(p_display);

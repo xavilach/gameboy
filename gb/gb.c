@@ -4,16 +4,9 @@
 #include "cpu/cpu.h"
 #include "ppu/ppu.h"
 #include "screen.h"
+#include "timer.h"
 
 #include <stdlib.h>
-
-typedef struct gb_s
-{
-    mmu_t *mmu;
-    cpu_t *cpu;
-    ppu_t *ppu;
-    screen_t *screen;
-} gb_t;
 
 #ifndef min
 #define min(a, b) (((a) < (b)) ? (a) : (b))
@@ -82,8 +75,14 @@ int gb_execute(gb_t *p_gb, double duration_ms)
     int ppu_cycles = 0;
     int mmu_cycles = 0;
 
+    /**********/
+    cycles *= 2;
+    /**********/
+
     while (cycles > 0)
     {
+        timer_run(p_gb->cpu);
+
         if (!cpu_cycles)
         {
             cpu_cycles = cpu_execute(p_gb->cpu);

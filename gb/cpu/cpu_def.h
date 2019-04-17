@@ -19,6 +19,12 @@ typedef struct cpu_s
     uint8_t irq_master_enable;
     int di_counter;
     int ei_counter;
+
+    int halted;
+
+    int div_counter;
+    int tim_counter;
+    int tim_clock;
 } cpu_t;
 
 #endif /*CPU_DEF_H_*/
