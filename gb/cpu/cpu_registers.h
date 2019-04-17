@@ -45,60 +45,72 @@ typedef enum mnemonic_e
 
 /* Inlined function definitions */
 
-static inline void set_flag_Z(cpu_t *p_cpu, uint8_t flag)
+static inline void set_flag_Z(cpu_t *p_cpu, int flag)
 {
-    flag &= (uint8_t)0x01;
-    flag <<= 7;
-
-    p_cpu->reg_AF &= (uint16_t)0xFF7F;
-    p_cpu->reg_AF |= (uint16_t)flag;
+    if (flag)
+    {
+        p_cpu->reg_AF |= (uint16_t)0x0080;
+    }
+    else
+    {
+        p_cpu->reg_AF &= (uint16_t)0xFF7F;
+    }
 }
 
-static inline uint8_t get_flag_Z(cpu_t *p_cpu)
+static inline int get_flag_Z(cpu_t *p_cpu)
 {
-    return (uint8_t)((p_cpu->reg_AF >> 7) & 0x01);
+    return (0 != (p_cpu->reg_AF & (uint16_t)0x0080));
 }
 
-static inline void set_flag_N(cpu_t *p_cpu, uint8_t flag)
+static inline void set_flag_N(cpu_t *p_cpu, int flag)
 {
-    flag &= (uint8_t)0x01;
-    flag <<= 6;
-
-    p_cpu->reg_AF &= (uint16_t)0xFFBF;
-    p_cpu->reg_AF |= (uint16_t)flag;
+    if (flag)
+    {
+        p_cpu->reg_AF |= (uint16_t)0x0040;
+    }
+    else
+    {
+        p_cpu->reg_AF &= (uint16_t)0xFFBF;
+    }
 }
 
 static inline uint8_t get_flag_N(cpu_t *p_cpu)
 {
-    return (uint8_t)((p_cpu->reg_AF >> 6) & 0x01);
+    return (0 != (p_cpu->reg_AF & (uint16_t)0x0040));
 }
 
-static inline void set_flag_H(cpu_t *p_cpu, uint8_t flag)
+static inline void set_flag_H(cpu_t *p_cpu, int flag)
 {
-    flag &= (uint8_t)0x01;
-    flag <<= 5;
-
-    p_cpu->reg_AF &= (uint16_t)0xFFDF;
-    p_cpu->reg_AF |= (uint16_t)flag;
+    if (flag)
+    {
+        p_cpu->reg_AF |= (uint16_t)0x0020;
+    }
+    else
+    {
+        p_cpu->reg_AF &= (uint16_t)0xFFDF;
+    }
 }
 
-static inline uint8_t get_flag_H(cpu_t *p_cpu)
+static inline int get_flag_H(cpu_t *p_cpu)
 {
-    return (uint8_t)((p_cpu->reg_AF >> 5) & 0x01);
+    return (0 != (p_cpu->reg_AF & (uint16_t)0x0020));
 }
 
-static inline void set_flag_C(cpu_t *p_cpu, uint8_t flag)
+static inline void set_flag_C(cpu_t *p_cpu, int flag)
 {
-    flag &= (uint8_t)0x01;
-    flag <<= 4;
-
-    p_cpu->reg_AF &= (uint16_t)0xFFEF;
-    p_cpu->reg_AF |= (uint16_t)flag;
+    if (flag)
+    {
+        p_cpu->reg_AF |= (uint16_t)0x0010;
+    }
+    else
+    {
+        p_cpu->reg_AF &= (uint16_t)0xFFEF;
+    }
 }
 
-static inline uint8_t get_flag_C(cpu_t *p_cpu)
+static inline int get_flag_C(cpu_t *p_cpu)
 {
-    return (uint8_t)((p_cpu->reg_AF >> 4) & 0x01);
+    return (0 != (p_cpu->reg_AF & (uint16_t)0x0010));
 }
 
 static inline void push_u8(cpu_t *p_cpu, uint8_t u8)

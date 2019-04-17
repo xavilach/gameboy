@@ -631,53 +631,39 @@ static int opcode8_LDD_A_HL(cpu_t *p_cpu)
 //correct representation of Binary Coded Decimal (BCD) is obtained.
 static int opcode8_DAA(cpu_t *p_cpu)
 {
-	uint8_t flag_c = get_flag_C(p_cpu);
-	uint8_t flag_h = get_flag_H(p_cpu);
-	uint8_t flag_n = get_flag_N(p_cpu);
+	uint8_t reg_a = get_msb(p_cpu->reg_AF);
 
-	uint16_t reg_a = get_msb(p_cpu->reg_AF);
-
-	set_flag_C(p_cpu, 0);
-
-	if (!flag_n)
+	if (!get_flag_N(p_cpu))
 	{
-		if (flag_h || ((reg_a & 0x0F) > 0x09))
-		{
-			reg_a += 0x6;
-		}
-		if (flag_c || (reg_a > 0x9F))
+		/* After addition. */
+		if (get_flag_C(p_cpu) || (reg_a > 0x99))
 		{
 			reg_a += 0x60;
+			set_flag_C(p_cpu, 1);
+		}
+		if (get_flag_H(p_cpu) || ((reg_a & 0x0F) > 0x09))
+		{
+			reg_a += 0x6;
 		}
 	}
 	else
 	{
-		if (flag_h)
-		{
-			reg_a -= 0x06;
-			if (!flag_c)
-			{
-				reg_a &= 0xFF;
-			}
-		}
-		if (flag_c)
+		/* After substraction. */
+		if (get_flag_C(p_cpu))
 		{
 			reg_a -= 0x60;
 		}
+		if (get_flag_H(p_cpu))
+		{
+			reg_a -= 0x6;
+		}
 	}
 
-	set_flag_Z(p_cpu, 0);
+	set_msb(&p_cpu->reg_AF, reg_a);
+
+	/* Update z and h flags. */
+	set_flag_Z(p_cpu, (reg_a == 0));
 	set_flag_H(p_cpu, 0);
-
-	if (reg_a & 0x0100)
-	{
-		set_flag_C(p_cpu, 1);
-	}
-	reg_a &= 0xFF;
-	if (!reg_a)
-	{
-		set_flag_Z(p_cpu, 1);
-	}
 
 	DEBUG_PRINT("%04x:DAA\n", p_cpu->pc, get_msb(p_cpu->reg_AF), reg_a);
 	p_cpu->pc += 1;
@@ -716,7 +702,7 @@ static int opcode8_CCF(cpu_t *p_cpu)
 {
 	set_flag_N(p_cpu, 0);
 	set_flag_H(p_cpu, 0);
-	set_flag_C(p_cpu, ~get_flag_C(p_cpu));
+	set_flag_C(p_cpu, !get_flag_C(p_cpu));
 
 	DEBUG_PRINT("%04x:CCF\n", p_cpu->pc);
 	p_cpu->pc += 1;
