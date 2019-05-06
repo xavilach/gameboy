@@ -42,6 +42,8 @@ cartridge_t *cartridge_allocate(char *path)
             break;
 
         case CART_TYPE_MBC1:
+        case CART_TYPE_MBC1_RAM:
+        case CART_TYPE_MBC1_RAM_BATTERY:
             p_cartridge->read_rom = cartridge_read_rom_mbc1;
             p_cartridge->write_rom = cartridge_write_rom_mbc1;
             p_cartridge->read_ram = cartridge_read_ram_mbc1;
