@@ -462,7 +462,7 @@ static int mmu_write_io(mmu_t *p_mmu, uint16_t address, uint8_t data)
             p_mmu->dma.source <= 8;
             p_mmu->dma.destination = 0xFE00;
 
-            printf("MMU: Starting DMA transfer from 0x%04x to 0x%04x\n", p_mmu->dma.source, p_mmu->dma.destination);
+            //printf("MMU: Starting DMA transfer from 0x%04x to 0x%04x\n", p_mmu->dma.source, p_mmu->dma.destination);
             //exit(-1);
         }
         break;
