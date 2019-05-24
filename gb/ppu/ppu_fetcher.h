@@ -372,7 +372,7 @@ static inline void fetch_run(ppu_t *p_ppu)
             {
                 oam_entry_t *entry = &(p_ppu->sprites.entries[s]);
 
-                if (entry->x == p_ppu->status.pixel_index)
+                if ((entry->x == p_ppu->status.pixel_index) && (entry->x >= 8))
                 {
                     /* Disable this entry. */
                     p_ppu->sprites.visibles[v] = -1;
