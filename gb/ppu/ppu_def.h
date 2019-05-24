@@ -118,7 +118,6 @@ typedef struct ppu_s
         int cycles;
         uint8_t line_y;
         uint8_t line_y_compare;
-        int pixel_index;
     } status;
 
     viewport_t viewport;
@@ -131,8 +130,9 @@ typedef struct ppu_s
     mmu_t *mmu;
     screen_t *screen;
 
-    ppu_fetcher_t fetcher;
-    ppu_fifo_t fifo;
+    //ppu_fetcher_t fetcher;
+    //ppu_fifo_t fifo;
+    pixel_data_t line[160];
 } ppu_t;
 
 #endif /*PPU_DEF_H*/
