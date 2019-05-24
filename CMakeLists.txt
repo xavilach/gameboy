@@ -4,11 +4,6 @@ set(PROJECT_NAME gameboy-emulator)
 
 project(${PROJECT_NAME})
 
-set(SDL2_LIBDIR "C:/SDL2-2.0.9/i686-w64-mingw32/lib")
-set(SDL2_INCLUDE_DIRS "C:/SDL2-2.0.9/i686-w64-mingw32/include")
-set(SDL2_LIBRARIES "-L${SDL2_LIBDIR}  -lmingw32 -lSDL2main -lSDL2 -lSDL2_ttf -mwindows -mconsole")
-string(STRIP "${SDL2_LIBRARIES}" SDL2_LIBRARIES)
-
 include_directories("./gb")
 include_directories("./gb/cpu")
 include_directories("./gb/mmu")
@@ -35,14 +30,17 @@ set(HEADERS ${HEADERS} gb/ppu/ppu.h gb/ppu/ppu_regs.h gb/ppu/ppu_def.h gb/ppu/pp
 set(HEADERS ${HEADERS} gb/serial/serial.h)
 set(HEADERS ${HEADERS} gui/display.h)
 
-#set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 
 find_package(Threads)
-#find_package(SDL2 REQUIRED)
+find_package(SDL2 REQUIRED)
+find_package(SDL2TTF REQUIRED)
 
 include_directories(${SDL2_INCLUDE_DIRS})
+include_directories(${SDL2TTF_INCLUDE_DIRS})
 
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 target_link_libraries(${PROJECT_NAME} Threads::Threads)
 target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} ${SDL2TTF_LIBRARY})
