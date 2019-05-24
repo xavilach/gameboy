@@ -1,6 +1,7 @@
 #include "cpu_opcode.h"
 
 #include <assert.h>
+#include <stdlib.h>
 
 /* Defines */
 
